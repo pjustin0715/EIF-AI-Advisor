@@ -1,4 +1,5 @@
 import os
+import json
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from fastapi import FastAPI, Depends, HTTPException, status
@@ -59,17 +60,12 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
     return {"username": username}
 
-def load_system_prompt():
-    with open("systemprompt.md", "r") as f:
-        return f.read()
-
-system_prompt = load_system_prompt()
 gemini_api_key = os.getenv("GEMINI_API_KEY")
 
 if not gemini_api_key:
     raise ValueError("GEMINI_API_KEY is not set in environment variables")
 
-ai_platform = Gemini(api_key=gemini_api_key, system_prompt=system_prompt)
+ai_platform = Gemini(api_key=gemini_api_key)
 
 ADVISORS = {
     "advisor1": {"name": "Data Dashboard Advisor", "doc_id": os.getenv("DOC_ID_ADVISOR1", "")},
@@ -84,6 +80,18 @@ def get_docs_service():
     global docs_service
     if docs_service:
         return docs_service
+        
+    sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if sa_json:
+        try:
+            creds_info = json.loads(sa_json)
+            creds = service_account.Credentials.from_service_account_info(
+                creds_info, scopes=DOCS_SCOPES)
+            docs_service = build('docs', 'v1', credentials=creds)
+            return docs_service
+        except Exception as e:
+            print(f"Failed to load service account from env: {e}")
+            
     if os.path.exists("service_account.json"):
         creds = service_account.Credentials.from_service_account_file(
             "service_account.json", scopes=DOCS_SCOPES)
@@ -121,7 +129,7 @@ def get_advisor_prompt(advisor_id: str) -> str:
     advisor_text = fetch_doc_text(doc_id) if doc_id else ""
     
     if not dna_text and not advisor_text:
-        return system_prompt
+        return ""
         
     combined = f"{dna_text}\n\n{advisor_text}".strip()
     return combined
@@ -228,7 +236,7 @@ def delete_chat(chat_id: str, current_user: dict = Depends(get_current_user)):
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest, current_user: dict = Depends(get_current_user)):
-    apply_rate_limit("global_unauthenticated_user")
+    apply_rate_limit(current_user["username"])
     if not supabase:
         raise HTTPException(status_code=500, detail="Database not configured")
         

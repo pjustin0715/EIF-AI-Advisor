@@ -1,8 +1,7 @@
 from google import genai
 from google.genai import types
-from base import AIPlatform
 
-class Gemini(AIPlatform):
+class Gemini:
     def __init__(self, api_key: str, system_prompt: str | None = None):
         self.system_prompt = system_prompt
         self.client = genai.Client(api_key=api_key)
