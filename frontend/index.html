@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat Interface - Secured</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+
+<body>
+
+    <div class="app-container">
+
+        <!-- Login Overlay -->
+        <div id="login-overlay">
+            <div class="login-box">
+                <h2>Need help with your track? Ask away</h2>
+                <p class="subtitle">Your Personal EIF AI Advisor</p>
+                <div id="login-error"></div>
+                <div id="buttonDiv" style="display: flex; justify-content: center; margin-top: 20px;"></div>
+            </div>
+        </div>
+
+        <!-- New Chat Modal -->
+        <div id="new-chat-modal" class="modal-overlay hidden">
+            <div class="modal-box">
+                <h3>Create New Chat</h3>
+                <input type="text" id="new-chat-title" placeholder="Chat Title (e.g. Help with math)"
+                    autocomplete="off">
+                <select id="new-chat-advisor">
+                    <option value="">Loading advisors...</option>
+                </select>
+                <div class="btn-row">
+                    <button class="cancel" onclick="closeNewChatModal()">Cancel</button>
+                    <button onclick="submitNewChat()">Create</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Chats</h2>
+                <button class="new-chat-btn" onclick="openNewChatModal()" title="New Chat">+</button>
+            </div>
+            <div class="chat-list" id="chatList">
+                <!-- Chat items will be injected here -->
+            </div>
+        </div>
+
+        <!-- Main Chat Interface -->
+        <div class="main-chat">
+            <div class="header">
+                <div class="header-title">
+                    <h1 id="active-advisor-name">AI Advisor</h1>
+                </div>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+
+            <div class="chat-messages" id="chatbox">
+                <div class="chat-messages-inner" id="chatbox-inner">
+                    <div class="empty-chat">Select or create a chat to begin.</div>
+                </div>
+            </div>
+
+            <div class="input-container">
+                <div class="input-area">
+                    <input type="text" id="userInput" placeholder="Message..." autocomplete="off"
+                        onkeypress="if(event.key==='Enter') sendMessage()" disabled>
+                    <button id="sendBtn" onclick="sendMessage()" disabled>
+                        <svg viewBox="0 0 24 24">
+                            <path d="M3 20V4L22 12L3 20ZM5 17L16.85 12L5 7V10.5L11 12L5 13.5V17Z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+
+</html>
