@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from services.db import supabase
@@ -102,7 +102,7 @@ def chat(request: ChatRequest, current_user: dict = Depends(get_current_user)):
     
     supabase.table("messages").insert({
         "chat_id": request.chat_id,
-        "role": "ai",
+        "role": "model",
         "content": ai_response
     }).execute()
     
