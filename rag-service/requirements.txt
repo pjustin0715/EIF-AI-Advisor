@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+google-genai
+python-dotenv
+supabase
+google-auth
+google-api-python-client
+httpx
+tiktoken
