@@ -42,6 +42,7 @@ export default function ChatInterface() {
   const [streamingText, setStreamingText] = useState("");
   const [streamingCitations, setStreamingCitations] = useState<string[]>([]);
   const chatboxRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const scrollToBottom = useCallback(() => {
     if (chatboxRef.current) {
@@ -107,6 +108,10 @@ export default function ChatInterface() {
     loadChats();
   }
 
+  function stopStreaming() {
+    abortRef.current?.abort();
+  }
+
   async function sendMessage() {
     if (!input.trim() || !activeChatId || loading) return;
 
@@ -117,6 +122,9 @@ export default function ChatInterface() {
     setStreamingText("");
     setMessages((prev) => [...prev, { role: "user", content: text }]);
 
+    const abort = new AbortController();
+    abortRef.current = abort;
+
     let assistantText = "";
     let citations: string[] = [];
 
@@ -125,6 +133,7 @@ export default function ChatInterface() {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({ prompt: text, chat_id: activeChatId }),
+        signal: abort.signal,
       });
 
       if (res.status === 401) {
@@ -170,12 +179,24 @@ export default function ChatInterface() {
       ]);
       setStreamingText("");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Request failed";
-      setMessages((prev) => [...prev, { role: "model", content: `Error: ${msg}` }]);
-      setStreamingText("");
+      if (err instanceof Error && err.name === "AbortError") {
+        // User stopped — commit whatever was streamed so far
+        if (assistantText) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "model", content: assistantText, citations },
+          ]);
+        }
+        setStreamingText("");
+      } else {
+        const msg = err instanceof Error ? err.message : "Request failed";
+        setMessages((prev) => [...prev, { role: "model", content: `Error: ${msg}` }]);
+        setStreamingText("");
+      }
     } finally {
       setLoading(false);
       setStreamingCitations([]);
+      abortRef.current = null;
     }
   }
 
@@ -313,15 +334,23 @@ export default function ChatInterface() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
             />
-            <button
-              disabled={!isAuthenticated || !activeChatId || loading}
-              onClick={sendMessage}
-              type="button"
-            >
-              <svg viewBox="0 0 24 24">
-                <path d="M3 20V4L22 12L3 20ZM5 17L16.85 12L5 7V10.5L11 12L5 13.5V17Z" />
-              </svg>
-            </button>
+            {loading ? (
+              <button onClick={stopStreaming} type="button" className="stop-btn">
+                <svg viewBox="0 0 24 24">
+                  <rect x="6" y="6" width="12" height="12" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                disabled={!isAuthenticated || !activeChatId}
+                onClick={sendMessage}
+                type="button"
+              >
+                <svg viewBox="0 0 24 24">
+                  <path d="M3 20V4L22 12L3 20ZM5 17L16.85 12L5 7V10.5L11 12L5 13.5V17Z" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </div>

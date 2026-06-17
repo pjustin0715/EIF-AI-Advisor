@@ -4,7 +4,16 @@ import { createAccessToken } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
-  const { credential } = await req.json();
+  const body = await req.json();
+
+  // DEV BYPASS: skip Google OAuth entirely
+  if (process.env.DEV_BYPASS === "true") {
+    const email = process.env.DEV_BYPASS_EMAIL ?? "dev@localhost";
+    const access_token = await createAccessToken(email);
+    return NextResponse.json({ access_token, token_type: "bearer" });
+  }
+
+  const { credential } = body;
   const clientId = process.env.GOOGLE_CLIENT_ID;
 
   if (!credential || !clientId) {

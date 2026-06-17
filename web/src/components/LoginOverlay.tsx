@@ -35,6 +35,24 @@ export default function LoginOverlay({ onLogin }: Props) {
       try {
         const res = await fetch("/api/auth/config");
         const config = await res.json();
+
+        // DEV BYPASS: skip Google OAuth
+        if (config.dev_bypass) {
+          const authRes = await fetch("/api/auth/google", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          });
+          if (authRes.ok) {
+            const data = await authRes.json();
+            setAccessToken(data.access_token, data.picture);
+            onLogin();
+          } else {
+            setError("Dev bypass login failed.");
+          }
+          return;
+        }
+
         if (!config.google_client_id || !window.google || !buttonRef.current) {
           setError("Google Client ID not configured.");
           return;
@@ -85,6 +103,16 @@ export default function LoginOverlay({ onLogin }: Props) {
           initGoogle();
         }
       }, 100);
+      // Also try immediately in case google never loads (e.g. during dev bypass)
+      fetch("/api/auth/config")
+        .then((r) => r.json())
+        .then((config) => {
+          if (config.dev_bypass) {
+            clearInterval(interval);
+            initGoogle();
+          }
+        })
+        .catch(() => {});
       return () => clearInterval(interval);
     }
   }, [onLogin]);
