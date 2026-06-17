@@ -1,0 +1,56 @@
+{
+  "cases": [
+    {
+      "id": "dd-01",
+      "advisor_id": "advisor1",
+      "query": "How should I structure a decision-ready Looker Studio dashboard for regional sales data?",
+      "expected_sections": ["Communication", "voice", "diagnostic"],
+      "reference_answer": "Provides step-by-step advisory guidance in Eskwelabs voice; asks diagnostic questions; does not build the dashboard for the user."
+    },
+    {
+      "id": "dd-02",
+      "advisor_id": "advisor1",
+      "query": "What layout template should I use for a KPI dashboard?",
+      "expected_sections": ["formatting", "lexicon"],
+      "reference_answer": "Suggests a layout framework and guiding questions; stays advisory."
+    },
+    {
+      "id": "ssot-01",
+      "advisor_id": "advisor2",
+      "query": "Help me build an interview guide to extract our onboarding process into an SSOT memo.",
+      "expected_sections": ["Communication", "voice"],
+      "reference_answer": "Provides interview guide template and structuring feedback; EIF remains responsible for final memo."
+    },
+    {
+      "id": "ssot-02",
+      "advisor_id": "advisor2",
+      "query": "What sections should an SSOT memo include?",
+      "expected_sections": ["lexicon", "formatting"],
+      "reference_answer": "Lists recommended sections with Eskwelabs formatting conventions."
+    },
+    {
+      "id": "dm-01",
+      "advisor_id": "advisor3",
+      "query": "How do I model a star schema for e-commerce orders?",
+      "expected_sections": ["diagnostic", "learning"],
+      "reference_answer": "Guides apprentice through diagnostic-first data modeling steps."
+    },
+    {
+      "id": "brand-01",
+      "advisor_id": "advisor1",
+      "query": "What tone should I use when writing to stakeholders?",
+      "expected_sections": ["voice", "Communication", "email"],
+      "reference_answer": "References Eskwelabs institutional communication voice and email posture."
+    }
+  ],
+  "rubric_weights": {
+    "task_success": 0.20,
+    "brand_voice": 0.15,
+    "factual_accuracy": 0.10,
+    "policy_compliance": 0.20,
+    "instruction_adherence": 0.15,
+    "clarity": 0.05,
+    "robustness": 0.15
+  },
+  "pass_threshold": 3.5
+}

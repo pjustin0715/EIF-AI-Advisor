@@ -4,19 +4,19 @@ overview: Re-architect the Eskwelabs AI Advisor into a hybrid Next.js (Vercel) +
 todos:
   - id: schema
     content: "Add Supabase pgvector extension + migrations: documents, doc_chunks (vector), turn_logs; extend messages/chats as needed"
-    status: in_progress
+    status: completed
   - id: ragservice-scaffold
     content: Scaffold FastAPI RAG service (/rag-service) with config, Supabase client, Google embeddings (gemini-embedding-001) client
-    status: pending
+    status: completed
   - id: ingestion
     content: "Implement revision-aware ingestion: fetch DNA via Docs API, chunk by heading (~300-500 tokens, overlap), embed, upsert to doc_chunks; delete stale; regenerate voice digest; manual /reindex + TTL revision check"
-    status: pending
+    status: completed
   - id: retrieve-endpoint
     content: "Implement /retrieve: embed query, pgvector top-k cosine search, return chunks + section-heading citations; low-grounding fallback"
-    status: pending
+    status: completed
   - id: nextjs-scaffold
     content: Scaffold Next.js (App Router + TS) app in /web; port frontend chat UI, advisor picker, history, markdown render
-    status: pending
+    status: in_progress
   - id: nextauth
     content: Implement NextAuth Google login + Supabase allow_list check (replace JWT/auth.py flow)
     status: pending
@@ -34,10 +34,10 @@ todos:
     status: pending
   - id: eval-harness
     content: "Build eval harness: golden Q/A set per advisor, retrieval hit@k metric, LLM-as-judge on PRD rubric, runnable script + report"
-    status: pending
+    status: completed
   - id: advisor-prompt-cache
     content: Cache full advisor prompts in-memory with revision/TTL check (no chunking of advisor docs)
-    status: pending
+    status: completed
   - id: deploy
     content: "Deployment config: Next.js to Vercel; FastAPI RAG service to Vercel Python functions or separate host; env vars + .env.example"
     status: pending
