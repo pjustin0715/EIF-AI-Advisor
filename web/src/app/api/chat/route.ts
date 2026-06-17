@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import {
   estimateCost,
   estimateTokens,
@@ -13,14 +12,14 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 const MAX_HISTORY_MESSAGES = 40;
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
+  const user = await getCurrentUser(req);
+  if (!user) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
     });
   }
 
-  const userEmail = session.user.email;
+  const userEmail = user.email;
   const startTime = Date.now();
   const { prompt, chat_id } = await req.json();
 

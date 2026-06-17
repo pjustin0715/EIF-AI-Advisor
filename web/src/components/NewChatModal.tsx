@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { authHeaders } from "@/lib/auth-client";
 
 interface AdvisorMap {
   [id: string]: { name: string };
@@ -35,7 +36,7 @@ export default function NewChatModal({ open, onClose, onCreated }: Props) {
     if (!advisorId) return;
     const res = await fetch("/api/chats", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify({ title: title.trim() || "New Chat", advisor_id: advisorId }),
     });
     if (res.ok) {

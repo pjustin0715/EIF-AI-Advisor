@@ -1,8 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSession } from "next-auth/react";
 import { marked } from "marked";
+import {
+  authHeaders,
+  clearAccessToken,
+  getAccessToken,
+  getProfilePicture,
+} from "@/lib/auth-client";
 import LoginOverlay, { LogoutButton } from "./LoginOverlay";
 import NewChatModal from "./NewChatModal";
 import Sidebar from "./Sidebar";
@@ -26,7 +31,7 @@ const ADVISOR_NAMES: Record<string, string> = {
 };
 
 export default function ChatInterface() {
-  const { status } = useSession();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -45,7 +50,12 @@ export default function ChatInterface() {
   }, []);
 
   const loadChats = useCallback(async () => {
-    const res = await fetch("/api/chats");
+    const res = await fetch("/api/chats", { headers: authHeaders() });
+    if (res.status === 401) {
+      clearAccessToken();
+      setIsAuthenticated(false);
+      return;
+    }
     if (res.ok) {
       const data = await res.json();
       setChats(data);
@@ -56,27 +66,40 @@ export default function ChatInterface() {
   }, [activeChatId]);
 
   useEffect(() => {
-    if (status === "authenticated") loadChats();
-  }, [status, loadChats]);
+    if (getAccessToken()) {
+      setIsAuthenticated(true);
+      loadChats();
+    }
+  }, [loadChats]);
 
   useEffect(() => {
-    if (!activeChatId || status !== "authenticated") return;
-    fetch(`/api/chats/${activeChatId}`)
+    if (!activeChatId || !isAuthenticated) return;
+    fetch(`/api/chats/${activeChatId}`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => {
         setMessages(data.messages || []);
         const advId = data.chat?.advisor_id;
         setAdvisorName(ADVISOR_NAMES[advId] || "AI Advisor");
       });
-  }, [activeChatId, status]);
+  }, [activeChatId, isAuthenticated]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  function handleLogout() {
+    setIsAuthenticated(false);
+    setActiveChatId(null);
+    setChats([]);
+    setMessages([]);
+  }
+
   async function handleDeleteChat(id: string) {
     if (!confirm("Delete this chat?")) return;
-    await fetch(`/api/chats/${id}`, { method: "DELETE" });
+    await fetch(`/api/chats/${id}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
     if (activeChatId === id) {
       setActiveChatId(null);
       setMessages([]);
@@ -100,9 +123,14 @@ export default function ChatInterface() {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: JSON.stringify({ prompt: text, chat_id: activeChatId }),
       });
+
+      if (res.status === 401) {
+        handleLogout();
+        return;
+      }
 
       if (!res.ok || !res.body) {
         throw new Error(await res.text());
@@ -151,11 +179,18 @@ export default function ChatInterface() {
     }
   }
 
-  const isAuthenticated = status === "authenticated";
+  const profilePicture = getProfilePicture();
 
   return (
     <div className="app-container">
-      <LoginOverlay />
+      {!isAuthenticated && (
+        <LoginOverlay
+          onLogin={() => {
+            setIsAuthenticated(true);
+            loadChats();
+          }}
+        />
+      )}
       <NewChatModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -180,7 +215,7 @@ export default function ChatInterface() {
           <div className="header-title">
             <h1>{advisorName}</h1>
           </div>
-          {isAuthenticated && <LogoutButton />}
+          {isAuthenticated && <LogoutButton onLogout={handleLogout} />}
         </div>
 
         <div className="chat-messages" ref={chatboxRef}>
@@ -198,7 +233,15 @@ export default function ChatInterface() {
               messages.map((msg, idx) => (
                 <div key={idx} className="message">
                   <div className={`avatar ${msg.role === "user" ? "user" : "ai"}`}>
-                    {msg.role === "user" ? "U" : "AI"}
+                    {msg.role === "user" ? (
+                      profilePicture ? (
+                        <img src={profilePicture} alt="User" className="avatar-img" />
+                      ) : (
+                        "U"
+                      )
+                    ) : (
+                      "AI"
+                    )}
                   </div>
                   <div className="message-content">
                     <div

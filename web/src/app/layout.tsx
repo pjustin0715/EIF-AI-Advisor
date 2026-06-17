@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import Providers from "@/components/Providers";
+import Script from "next/script";
 import ChatInterface from "@/components/ChatInterface";
 import "./globals.css";
 
@@ -19,10 +19,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Providers>
-          <ChatInterface />
-          {children}
-        </Providers>
+        <Script
+          src="https://accounts.google.com/gsi/client"
+          strategy="beforeInteractive"
+        />
+        <ChatInterface />
+        {children}
       </body>
     </html>
   );

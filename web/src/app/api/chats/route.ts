@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { ADVISORS, getSupabaseAdmin } from "@/lib/supabase";
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
+export async function GET(req: NextRequest) {
+  const user = await getCurrentUser(req);
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -13,7 +12,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("chats")
     .select("*")
-    .eq("user_email", session.user.email)
+    .eq("user_email", user.email)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -24,8 +23,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
+  const user = await getCurrentUser(req);
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -40,7 +39,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from("chats")
     .insert({
-      user_email: session.user.email,
+      user_email: user.email,
       title: title || "New Chat",
       advisor_id,
     })

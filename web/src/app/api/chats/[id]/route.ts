@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
+  const user = await getCurrentUser(req);
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -17,7 +16,7 @@ export async function GET(
     .from("chats")
     .select("*")
     .eq("id", params.id)
-    .eq("user_email", session.user.email)
+    .eq("user_email", user.email)
     .maybeSingle();
 
   if (chatError || !chat) {
@@ -34,11 +33,11 @@ export async function GET(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
+  const user = await getCurrentUser(req);
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -47,7 +46,7 @@ export async function DELETE(
     .from("chats")
     .select("id")
     .eq("id", params.id)
-    .eq("user_email", session.user.email)
+    .eq("user_email", user.email)
     .maybeSingle();
 
   if (!chat) {

@@ -1,40 +1,35 @@
-import type { NextAuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
-import { getSupabaseAdmin } from "./supabase";
+import { SignJWT, jwtVerify } from "jose";
+import { NextRequest } from "next/server";
 
-export const authOptions: NextAuthOptions = {
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-  ],
-  callbacks: {
-    async signIn({ user }) {
-      if (!user.email) return false;
-      try {
-        const supabase = getSupabaseAdmin();
-        const { data } = await supabase
-          .from("allowed_users")
-          .select("email, is_active")
-          .eq("email", user.email)
-          .maybeSingle();
+const ALGORITHM = "HS256";
+const EXPIRE_MINUTES = 30;
 
-        if (!data || data.is_active === false) {
-          return "/?error=AccessDenied";
-        }
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    async session({ session }) {
-      return session;
-    },
-  },
-  pages: {
-    signIn: "/",
-    error: "/",
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-};
+function getSecret() {
+  const key = process.env.SECRET_KEY || process.env.NEXTAUTH_SECRET;
+  if (!key) throw new Error("SECRET_KEY is not configured");
+  return new TextEncoder().encode(key);
+}
+
+export async function createAccessToken(email: string): Promise<string> {
+  return new SignJWT({ sub: email })
+    .setProtectedHeader({ alg: ALGORITHM })
+    .setIssuedAt()
+    .setExpirationTime(`${EXPIRE_MINUTES}m`)
+    .sign(getSecret());
+}
+
+export async function getCurrentUser(
+  req: NextRequest
+): Promise<{ email: string } | null> {
+  const auth = req.headers.get("authorization");
+  if (!auth?.startsWith("Bearer ")) return null;
+
+  try {
+    const { payload } = await jwtVerify(auth.slice(7), getSecret());
+    const email = payload.sub;
+    if (!email || typeof email !== "string") return null;
+    return { email };
+  } catch {
+    return null;
+  }
+}
