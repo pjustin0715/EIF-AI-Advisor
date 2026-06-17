@@ -64,8 +64,8 @@ RAG_SERVICE_URL=http://localhost:8001 python evals/run_eval.py
 ## Deployment
 
 - **web/** → Vercel (set env vars from `.env.example`)
-- **rag-service/** → Render/Fly/Docker (`docker-compose.yml` included)
-- Point `RAG_SERVICE_URL` in Vercel to the deployed RAG service URL
+- **rag-service/** → [Render free tier](rag-service/DEPLOY.md) (step-by-step guide)
+- Point `RAG_SERVICE_URL` in Vercel/local `.env` to the deployed RAG service URL
 
 ## Key Design Decisions
 
