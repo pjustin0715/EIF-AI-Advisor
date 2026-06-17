@@ -8,9 +8,9 @@ load_dotenv(override=True)
 
 
 class Settings(BaseSettings):
-    gemini_api_key: str
-    supabase_url: str
-    supabase_key: str
+    gemini_api_key: str = ""
+    supabase_url: str = ""
+    supabase_key: str = ""
     google_service_account_json: str = ""
 
     doc_id_company_dna: str = ""
@@ -30,9 +30,7 @@ class Settings(BaseSettings):
 
     rag_service_secret: str = ""
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 @lru_cache

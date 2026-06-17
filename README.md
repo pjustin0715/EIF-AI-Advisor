@@ -1,17 +1,84 @@
-# EIF AI Advisor
+# Eskwelabs AI Advisor
 
-An AI assistant built for Eskwelabs. This web application provides a conversational interface where authenticated users can interact with specialized AI Advisors (Data Dashboard Advisor, SSOT Memo Advisor, Data Modeling Advisor).
+Hybrid **Next.js + FastAPI** platform for EIF mentoring advisors with **vector RAG** over the Eskwelabs DNA document.
 
-The application uses Google OAuth for secure login, Supabase for chat history and allowlisting, and Google Gemini as the language model. The AI's context is dynamically augmented by reading prompt instructions directly from private Google Docs.
+## Architecture
 
-## Tech Stack
-- **Frontend**: Vanilla HTML/CSS/JS (for now)
-- **Backend**: Python (FastAPI)
-- **Database & Auth**: Supabase, Google OAuth 2.0
-- **AI Model**: Google Gemini
-- **Integrations**: Google Docs API (via Service Account)
+```
+web/ (Next.js on Vercel)
+  ├── NextAuth Google login + allow-list
+  ├── Streaming chat UI with DNA citations
+  └── /api/chat → calls rag-service + Gemini
 
-## To Do
-- Models from different providers
-- Model and usage/cost management dashboard for admins
-- Update database schema
+rag-service/ (FastAPI Python)
+  ├── Revision-aware DNA ingestion → Supabase pgvector
+  ├── Google gemini-embedding-001 embeddings
+  ├── /retrieve (top-k DNA chunks + voice digest)
+  └── Cached full advisor prompts (not chunked)
+
+supabase/
+  └── migrations/001_rag_schema.sql (pgvector, turn_logs)
+```
+
+## Quick Start
+
+### 1. Database
+
+Run [`supabase/migrations/001_rag_schema.sql`](supabase/migrations/001_rag_schema.sql) in Supabase SQL editor.
+
+### 2. Environment
+
+Copy [`.env.example`](.env.example) to `.env` and fill in values.
+
+### 3. RAG Service
+
+```bash
+cd rag-service
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8001
+```
+
+Initial index:
+
+```bash
+curl -X POST "http://localhost:8001/reindex?force=true" -H "X-RAG-Secret: your-secret"
+```
+
+### 4. Next.js Web App
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Open http://localhost:3000
+
+### 5. Evals
+
+```bash
+cd rag-service
+RAG_SERVICE_URL=http://localhost:8001 python evals/run_eval.py
+```
+
+## Deployment
+
+- **web/** → Vercel (set env vars from `.env.example`)
+- **rag-service/** → Render/Fly/Docker (`docker-compose.yml` included)
+- Point `RAG_SERVICE_URL` in Vercel to the deployed RAG service URL
+
+## Key Design Decisions
+
+| Layer | Choice |
+|-------|--------|
+| Retrieval corpus | DNA doc only (chunked + embedded) |
+| Advisor prompts | Full doc, cached with revision/TTL (not RAG) |
+| Vector store | Supabase pgvector |
+| Embeddings | Google gemini-embedding-001 (768-dim) |
+| Freshness | Google revisionId check every 5 min + manual /reindex |
+| Trust UX | DNA section citations shown per reply |
+| Quality | Golden-set eval harness with hit@k retrieval metric |
+
+## Legacy
+
+The original FastAPI + vanilla JS app remains at repo root for reference. The new stack lives in `web/` and `rag-service/`.

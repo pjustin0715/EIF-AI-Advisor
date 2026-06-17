@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const userEmail = session.user.email;
   const startTime = Date.now();
   const { prompt, chat_id } = await req.json();
 
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
     .from("chats")
     .select("*")
     .eq("id", chat_id)
-    .eq("user_email", session.user.email)
+    .eq("user_email", userEmail)
     .maybeSingle();
 
   if (!chat) {
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
     const message = err instanceof Error ? err.message : "RAG service unavailable";
     await supabase.from("turn_logs").insert({
       conversation_id: chat_id,
-      user_email: session.user.email,
+      user_email: userEmail,
       advisor_id: chat.advisor_id,
       model: MODEL,
       status: "error",
@@ -132,7 +133,7 @@ export async function POST(req: NextRequest) {
 
         await supabase.from("turn_logs").insert({
           conversation_id: chat_id,
-          user_email: session.user.email,
+          user_email: userEmail,
           advisor_id: chat.advisor_id,
           model: MODEL,
           prompt_tokens: promptTokenEstimate,
@@ -149,7 +150,7 @@ export async function POST(req: NextRequest) {
         send({ type: "error", message });
         await supabase.from("turn_logs").insert({
           conversation_id: chat_id,
-          user_email: session.user.email,
+          user_email: userEmail,
           advisor_id: chat.advisor_id,
           model: MODEL,
           status: "error",

@@ -32,14 +32,16 @@ def retrieve_context(query: str) -> RetrievalResult:
     ensure_dna_fresh()
 
     supabase = get_supabase()
-    doc_row = (
+    doc_resp = (
         supabase.table("documents")
         .select("voice_digest")
         .eq("doc_id", DNA_DOC_KEY)
-        .maybe_single()
+        .limit(1)
         .execute()
     )
-    voice_digest = (doc_row.data or {}).get("voice_digest", "") if doc_row else ""
+    voice_digest = (
+        doc_resp.data[0].get("voice_digest", "") if doc_resp.data else ""
+    )
 
     embedder = EmbeddingService()
     query_embedding = embedder.embed_query(query)

@@ -1,0 +1,287 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
+import { marked } from "marked";
+import LoginOverlay, { LogoutButton } from "./LoginOverlay";
+import NewChatModal from "./NewChatModal";
+import Sidebar from "./Sidebar";
+
+interface Message {
+  role: "user" | "model" | "assistant";
+  content: string;
+  citations?: string[] | null;
+}
+
+interface Chat {
+  id: string;
+  title: string;
+  advisor_id: string;
+}
+
+const ADVISOR_NAMES: Record<string, string> = {
+  advisor1: "Data Dashboard Advisor",
+  advisor2: "SSOT Memo Advisor",
+  advisor3: "Data Modeling Advisor",
+};
+
+export default function ChatInterface() {
+  const { status } = useSession();
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [advisorName, setAdvisorName] = useState("AI Advisor");
+  const [streamingText, setStreamingText] = useState("");
+  const [streamingCitations, setStreamingCitations] = useState<string[]>([]);
+  const chatboxRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = useCallback(() => {
+    if (chatboxRef.current) {
+      chatboxRef.current.scrollTop = chatboxRef.current.scrollHeight;
+    }
+  }, []);
+
+  const loadChats = useCallback(async () => {
+    const res = await fetch("/api/chats");
+    if (res.ok) {
+      const data = await res.json();
+      setChats(data);
+      if (data.length > 0 && !activeChatId) {
+        setActiveChatId(data[0].id);
+      }
+    }
+  }, [activeChatId]);
+
+  useEffect(() => {
+    if (status === "authenticated") loadChats();
+  }, [status, loadChats]);
+
+  useEffect(() => {
+    if (!activeChatId || status !== "authenticated") return;
+    fetch(`/api/chats/${activeChatId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setMessages(data.messages || []);
+        const advId = data.chat?.advisor_id;
+        setAdvisorName(ADVISOR_NAMES[advId] || "AI Advisor");
+      });
+  }, [activeChatId, status]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  async function handleDeleteChat(id: string) {
+    if (!confirm("Delete this chat?")) return;
+    await fetch(`/api/chats/${id}`, { method: "DELETE" });
+    if (activeChatId === id) {
+      setActiveChatId(null);
+      setMessages([]);
+    }
+    loadChats();
+  }
+
+  async function sendMessage() {
+    if (!input.trim() || !activeChatId || loading) return;
+
+    const text = input.trim();
+    setInput("");
+    setLoading(true);
+    setStreamingCitations([]);
+    setStreamingText("");
+    setMessages((prev) => [...prev, { role: "user", content: text }]);
+
+    let assistantText = "";
+    let citations: string[] = [];
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: text, chat_id: activeChatId }),
+      });
+
+      if (!res.ok || !res.body) {
+        throw new Error(await res.text());
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = JSON.parse(line.slice(6));
+
+          if (payload.type === "citations") {
+            citations = payload.citations || [];
+            setStreamingCitations(citations);
+          } else if (payload.type === "token") {
+            assistantText += payload.text;
+            setStreamingText(assistantText);
+          } else if (payload.type === "error") {
+            throw new Error(payload.message);
+          }
+        }
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        { role: "model", content: assistantText, citations },
+      ]);
+      setStreamingText("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Request failed";
+      setMessages((prev) => [...prev, { role: "model", content: `Error: ${msg}` }]);
+      setStreamingText("");
+    } finally {
+      setLoading(false);
+      setStreamingCitations([]);
+    }
+  }
+
+  const isAuthenticated = status === "authenticated";
+
+  return (
+    <div className="app-container">
+      <LoginOverlay />
+      <NewChatModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onCreated={(id) => {
+          loadChats();
+          setActiveChatId(id);
+        }}
+      />
+
+      {isAuthenticated && (
+        <Sidebar
+          chats={chats}
+          activeChatId={activeChatId}
+          onSelect={setActiveChatId}
+          onDelete={handleDeleteChat}
+          onNewChat={() => setModalOpen(true)}
+        />
+      )}
+
+      <div className="main-chat">
+        <div className="header">
+          <div className="header-title">
+            <h1>{advisorName}</h1>
+          </div>
+          {isAuthenticated && <LogoutButton />}
+        </div>
+
+        <div className="chat-messages" ref={chatboxRef}>
+          <div className="chat-messages-inner">
+            {!isAuthenticated ? null : !activeChatId ? (
+              <div className="empty-chat">Select or create a chat to begin.</div>
+            ) : messages.length === 0 ? (
+              <div className="message">
+                <div className="avatar ai">AI</div>
+                <div className="message-content">
+                  Hi! How can I assist you today?
+                </div>
+              </div>
+            ) : (
+              messages.map((msg, idx) => (
+                <div key={idx} className="message">
+                  <div className={`avatar ${msg.role === "user" ? "user" : "ai"}`}>
+                    {msg.role === "user" ? "U" : "AI"}
+                  </div>
+                  <div className="message-content">
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: marked.parse(msg.content || ""),
+                      }}
+                    />
+                    {msg.citations && msg.citations.length > 0 && (
+                      <div className="citations">
+                        <strong>Sources (Eskwelabs DNA):</strong>
+                        <ul>
+                          {msg.citations.map((c, i) => (
+                            <li key={i}>{c}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+            {loading && (streamingText || streamingCitations.length > 0) && (
+              <div className="message">
+                <div className="avatar ai">AI</div>
+                <div className="message-content">
+                  {streamingCitations.length > 0 && (
+                    <div className="citations streaming-citations">
+                      Sources: {streamingCitations.join(", ")}
+                    </div>
+                  )}
+                  {streamingText ? (
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: marked.parse(streamingText),
+                      }}
+                    />
+                  ) : (
+                    <div className="loading">
+                      <div className="dot" />
+                      <div className="dot" />
+                      <div className="dot" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {loading && !streamingText && streamingCitations.length === 0 && (
+              <div className="message">
+                <div className="avatar ai">AI</div>
+                <div className="message-content">
+                  <div className="loading">
+                    <div className="dot" />
+                    <div className="dot" />
+                    <div className="dot" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="input-container">
+          <div className="input-area">
+            <input
+              type="text"
+              placeholder="Message..."
+              value={input}
+              disabled={!isAuthenticated || !activeChatId || loading}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            />
+            <button
+              disabled={!isAuthenticated || !activeChatId || loading}
+              onClick={sendMessage}
+              type="button"
+            >
+              <svg viewBox="0 0 24 24">
+                <path d="M3 20V4L22 12L3 20ZM5 17L16.85 12L5 7V10.5L11 12L5 13.5V17Z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

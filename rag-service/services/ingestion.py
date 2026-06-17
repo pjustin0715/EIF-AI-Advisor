@@ -41,14 +41,14 @@ def ingest_dna(force: bool = False) -> IngestResult:
     revision_id = metadata.get("revision_id", "unknown")
     supabase = get_supabase()
 
-    existing = (
+    existing_resp = (
         supabase.table("documents")
         .select("*")
         .eq("doc_id", DNA_DOC_KEY)
-        .maybe_single()
+        .limit(1)
         .execute()
     )
-    existing_row = existing.data if existing else None
+    existing_row = existing_resp.data[0] if existing_resp.data else None
 
     if (
         not force
