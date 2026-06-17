@@ -16,7 +16,6 @@ interface Message {
   role: "user" | "model" | "assistant";
   content: string;
   citations?: string[] | null;
-  doc_url?: string | null;
 }
 
 interface Chat {
@@ -42,14 +41,25 @@ export default function ChatInterface() {
   const [advisorName, setAdvisorName] = useState("AI Advisor");
   const [streamingText, setStreamingText] = useState("");
   const [streamingCitations, setStreamingCitations] = useState<string[]>([]);
-  const [streamingDocUrl, setStreamingDocUrl] = useState<string | null>(null);
+  const [dnaDocUrl, setDnaDocUrl] = useState<string | null>(null);
   const chatboxRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const activeChatIdRef = useRef<string | null>(null);
 
   const scrollToBottom = useCallback(() => {
     if (chatboxRef.current) {
       chatboxRef.current.scrollTop = chatboxRef.current.scrollHeight;
     }
+  }, []);
+
+  const loadMessages = useCallback(async (chatId: string) => {
+    const res = await fetch(`/api/chats/${chatId}`, { headers: authHeaders() });
+    if (!res.ok) return;
+    const data = await res.json();
+    setMessages(data.messages || []);
+    const advId = data.chat?.advisor_id;
+    setAdvisorName(ADVISOR_NAMES[advId] || "AI Advisor");
   }, []);
 
   const loadChats = useCallback(async () => {
@@ -62,29 +72,28 @@ export default function ChatInterface() {
     if (res.ok) {
       const data = await res.json();
       setChats(data);
-      if (data.length > 0 && !activeChatId) {
+      if (data.length > 0 && !activeChatIdRef.current) {
         setActiveChatId(data[0].id);
       }
     }
-  }, [activeChatId]);
+  }, []);
 
   useEffect(() => {
     if (getAccessToken()) {
       setIsAuthenticated(true);
       loadChats();
+      fetch("/api/auth/config")
+        .then((r) => r.json())
+        .then((c) => setDnaDocUrl(c.dna_doc_url ?? null))
+        .catch(() => {});
     }
   }, [loadChats]);
 
   useEffect(() => {
+    activeChatIdRef.current = activeChatId;
     if (!activeChatId || !isAuthenticated) return;
-    fetch(`/api/chats/${activeChatId}`, { headers: authHeaders() })
-      .then((r) => r.json())
-      .then((data) => {
-        setMessages(data.messages || []);
-        const advId = data.chat?.advisor_id;
-        setAdvisorName(ADVISOR_NAMES[advId] || "AI Advisor");
-      });
-  }, [activeChatId, isAuthenticated]);
+    loadMessages(activeChatId);
+  }, [activeChatId, isAuthenticated, loadMessages]);
 
   useEffect(() => {
     scrollToBottom();
@@ -130,7 +139,6 @@ export default function ChatInterface() {
 
     let assistantText = "";
     let citations: string[] = [];
-    let docUrl: string | null = null;
 
     try {
       const res = await fetch("/api/chat", {
@@ -167,9 +175,7 @@ export default function ChatInterface() {
 
           if (payload.type === "citations") {
             citations = payload.citations || [];
-            docUrl = payload.doc_url ?? null;
             setStreamingCitations(citations);
-            setStreamingDocUrl(docUrl);
           } else if (payload.type === "token") {
             assistantText += payload.text;
             setStreamingText(assistantText);
@@ -179,31 +185,23 @@ export default function ChatInterface() {
         }
       }
 
-      setMessages((prev) => [
-        ...prev,
-        { role: "model", content: assistantText, citations, doc_url: docUrl },
-      ]);
       setStreamingText("");
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
-        // User stopped — commit whatever was streamed so far
-        if (assistantText) {
-          setMessages((prev) => [
-            ...prev,
-            { role: "model", content: assistantText, citations, doc_url: docUrl },
-          ]);
-        }
-        setStreamingText("");
+        // User stopped — partial text already visible, just clear streaming state
       } else {
         const msg = err instanceof Error ? err.message : "Request failed";
         setMessages((prev) => [...prev, { role: "model", content: `Error: ${msg}` }]);
-        setStreamingText("");
       }
+      setStreamingText("");
     } finally {
       setLoading(false);
       setStreamingCitations([]);
-      setStreamingDocUrl(null);
       abortRef.current = null;
+      // Reload from DB to get the authoritative saved messages
+      if (activeChatIdRef.current) {
+        loadMessages(activeChatIdRef.current);
+      }
     }
   }
 
@@ -277,9 +275,9 @@ export default function ChatInterface() {
                         __html: marked.parse(msg.content || ""),
                       }}
                     />
-                    {msg.role !== "user" && msg.doc_url && (
+                    {msg.role !== "user" && dnaDocUrl && (
                       <a
-                        href={msg.doc_url}
+                        href={dnaDocUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="doc-link"
@@ -302,9 +300,9 @@ export default function ChatInterface() {
                           __html: marked.parse(streamingText),
                         }}
                       />
-                      {streamingDocUrl && (
+                      {dnaDocUrl && (
                         <a
-                          href={streamingDocUrl}
+                          href={dnaDocUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="doc-link"
