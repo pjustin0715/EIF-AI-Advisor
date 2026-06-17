@@ -10,6 +10,7 @@ export interface RagRetrieveResponse {
   citations: string[];
   retrieved_chunk_ids: string[];
   low_grounding: boolean;
+  doc_url: string | null;
 }
 
 export async function retrieveContext(

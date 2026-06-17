@@ -28,6 +28,7 @@ class RetrieveResponse(BaseModel):
     citations: list[str]
     retrieved_chunk_ids: list[str]
     low_grounding: bool
+    doc_url: str | None = None
 
 
 class ReindexResponse(BaseModel):
@@ -58,6 +59,11 @@ def retrieve(
     ]
     citations = [c.citation_label() for c in result.chunks]
 
+    # Build a Google Docs URL from the source doc_id
+    settings = get_settings()
+    doc_id_value = settings.doc_id_company_dna
+    doc_url = f"https://docs.google.com/document/d/{doc_id_value}/view" if doc_id_value else None
+
     return RetrieveResponse(
         voice_digest=result.voice_digest,
         advisor_prompt=advisor_prompt,
@@ -65,6 +71,7 @@ def retrieve(
         citations=citations,
         retrieved_chunk_ids=[c.id for c in result.chunks],
         low_grounding=result.low_grounding,
+        doc_url=doc_url,
     )
 
 

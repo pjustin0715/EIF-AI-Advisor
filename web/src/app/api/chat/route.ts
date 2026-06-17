@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
 
   const systemPrompt = buildSystemPrompt(ragContext);
   const citations = ragContext.citations;
+  const docUrl = ragContext.doc_url ?? null;
   const retrievedChunkIds = ragContext.retrieved_chunk_ids;
 
   const geminiHistory = history.map((m) => ({
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        send({ type: "citations", citations });
+        send({ type: "citations", citations, doc_url: docUrl });
 
         const result = await model.generateContentStream({
           contents: geminiHistory,

@@ -16,6 +16,7 @@ interface Message {
   role: "user" | "model" | "assistant";
   content: string;
   citations?: string[] | null;
+  doc_url?: string | null;
 }
 
 interface Chat {
@@ -41,6 +42,7 @@ export default function ChatInterface() {
   const [advisorName, setAdvisorName] = useState("AI Advisor");
   const [streamingText, setStreamingText] = useState("");
   const [streamingCitations, setStreamingCitations] = useState<string[]>([]);
+  const [streamingDocUrl, setStreamingDocUrl] = useState<string | null>(null);
   const chatboxRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -120,6 +122,7 @@ export default function ChatInterface() {
     setLoading(true);
     setStreamingCitations([]);
     setStreamingText("");
+    setStreamingDocUrl(null);
     setMessages((prev) => [...prev, { role: "user", content: text }]);
 
     const abort = new AbortController();
@@ -127,6 +130,7 @@ export default function ChatInterface() {
 
     let assistantText = "";
     let citations: string[] = [];
+    let docUrl: string | null = null;
 
     try {
       const res = await fetch("/api/chat", {
@@ -163,7 +167,9 @@ export default function ChatInterface() {
 
           if (payload.type === "citations") {
             citations = payload.citations || [];
+            docUrl = payload.doc_url ?? null;
             setStreamingCitations(citations);
+            setStreamingDocUrl(docUrl);
           } else if (payload.type === "token") {
             assistantText += payload.text;
             setStreamingText(assistantText);
@@ -175,7 +181,7 @@ export default function ChatInterface() {
 
       setMessages((prev) => [
         ...prev,
-        { role: "model", content: assistantText, citations },
+        { role: "model", content: assistantText, citations, doc_url: docUrl },
       ]);
       setStreamingText("");
     } catch (err) {
@@ -184,7 +190,7 @@ export default function ChatInterface() {
         if (assistantText) {
           setMessages((prev) => [
             ...prev,
-            { role: "model", content: assistantText, citations },
+            { role: "model", content: assistantText, citations, doc_url: docUrl },
           ]);
         }
         setStreamingText("");
@@ -196,6 +202,7 @@ export default function ChatInterface() {
     } finally {
       setLoading(false);
       setStreamingCitations([]);
+      setStreamingDocUrl(null);
       abortRef.current = null;
     }
   }
@@ -270,15 +277,15 @@ export default function ChatInterface() {
                         __html: marked.parse(msg.content || ""),
                       }}
                     />
-                    {msg.citations && msg.citations.length > 0 && (
-                      <div className="citations">
-                        <strong>Sources (Eskwelabs DNA):</strong>
-                        <ul>
-                          {msg.citations.map((c, i) => (
-                            <li key={i}>{c}</li>
-                          ))}
-                        </ul>
-                      </div>
+                    {msg.role !== "user" && msg.doc_url && (
+                      <a
+                        href={msg.doc_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="doc-link"
+                      >
+                        View source document →
+                      </a>
                     )}
                   </div>
                 </div>
@@ -288,17 +295,24 @@ export default function ChatInterface() {
               <div className="message">
                 <div className="avatar ai">AI</div>
                 <div className="message-content">
-                  {streamingCitations.length > 0 && (
-                    <div className="citations streaming-citations">
-                      Sources: {streamingCitations.join(", ")}
-                    </div>
-                  )}
                   {streamingText ? (
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html: marked.parse(streamingText),
-                      }}
-                    />
+                    <>
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: marked.parse(streamingText),
+                        }}
+                      />
+                      {streamingDocUrl && (
+                        <a
+                          href={streamingDocUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="doc-link"
+                        >
+                          View source document →
+                        </a>
+                      )}
+                    </>
                   ) : (
                     <div className="loading">
                       <div className="dot" />
