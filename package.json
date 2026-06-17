@@ -1,0 +1,12 @@
+{
+  "name": "eif-ai-advisor",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:rag\" \"npm run dev:web\"",
+    "dev:web": "cd web && npm run dev",
+    "dev:rag": "cd rag-service && uvicorn main:app --port 8001 --reload"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
