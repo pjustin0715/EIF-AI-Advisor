@@ -1,0 +1,32 @@
+# Render Blueprint — free tier RAG service
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: eif-rag-service
+    runtime: python
+    plan: free
+    rootDir: rag-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: DOC_ID_COMPANY_DNA
+        sync: false
+      - key: DOC_ID_ADVISOR1
+        sync: false
+      - key: DOC_ID_ADVISOR2
+        sync: false
+      - key: DOC_ID_ADVISOR3
+        sync: false
+      - key: RAG_SERVICE_SECRET
+        generateValue: true
