@@ -1,6 +1,7 @@
 const API_URL = '';
         let accessToken = localStorage.getItem('access_token');
         let activeChatId = null;
+        let pendingDeleteChatId = null;
 
         window.onload = async () => {
             if (accessToken) {
@@ -164,7 +165,19 @@ const API_URL = '';
 
         async function deleteChat(id, event) {
             event.stopPropagation(); // Prevent selectChat from firing
-            if (!confirm("Are you sure you want to delete this chat?")) return;
+            pendingDeleteChatId = id;
+            document.getElementById('delete-chat-modal').classList.remove('hidden');
+        }
+
+        function closeDeleteChatModal() {
+            pendingDeleteChatId = null;
+            document.getElementById('delete-chat-modal').classList.add('hidden');
+        }
+
+        async function confirmDeleteChat() {
+            const id = pendingDeleteChatId;
+            if (!id) return;
+            closeDeleteChatModal();
 
             try {
                 const res = await fetch(`${API_URL}/chats/${id}`, {
