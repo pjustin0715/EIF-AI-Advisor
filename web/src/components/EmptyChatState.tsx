@@ -64,10 +64,6 @@ export default function EmptyChatState({
           </button>
         </div>
 
-        {input.trim() && !loading && (
-          <p className="draft-hint draft-hint--center">Draft saved</p>
-        )}
-
         <SuggestionChips
           suggestions={suggestions}
           onSelect={onSuggestionSelect}

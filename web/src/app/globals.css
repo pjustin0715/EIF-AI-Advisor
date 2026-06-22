@@ -399,16 +399,6 @@ body {
   flex-shrink: 0;
 }
 
-.draft-hint {
-  margin: 6px 0 0;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  width: 100%;
-  max-width: 768px;
-  text-align: left;
-  padding-left: 4px;
-}
-
 .input-area {
   width: 100%;
   max-width: 768px;
@@ -617,12 +607,6 @@ body {
   width: 18px;
   height: 18px;
   fill: currentColor;
-}
-
-.draft-hint--center {
-  text-align: center;
-  padding-left: 0;
-  max-width: none;
 }
 
 .suggestion-chips {

@@ -1035,12 +1035,6 @@ export default function ChatInterface() {
 
               </div>
 
-              {activeChatId && input.trim() && !loading && (
-
-                <p className="draft-hint">Draft saved</p>
-
-              )}
-
             </div>
 
           </>
