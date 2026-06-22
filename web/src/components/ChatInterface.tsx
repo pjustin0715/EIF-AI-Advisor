@@ -40,6 +40,8 @@ import { ADVISOR_NAMES, getSuggestions } from "@/lib/suggestions";
 
 import EmptyChatState from "./EmptyChatState";
 
+import ConfirmDialog from "./ConfirmDialog";
+
 import LoginOverlay, { LogoutButton } from "./LoginOverlay";
 
 import NewChatModal from "./NewChatModal";
@@ -71,6 +73,11 @@ interface Chat {
   advisor_id: string;
 
 }
+
+type PendingDelete =
+  | { type: "single"; ids: string[] }
+  | { type: "bulk"; ids: string[] }
+  | null;
 
 
 
@@ -105,6 +112,8 @@ export default function ChatInterface() {
   const [selectMode, setSelectMode] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
 
 
 
@@ -351,57 +360,27 @@ export default function ChatInterface() {
 
 
 
-  async function handleDeleteChat(id: string) {
+  async function deleteChats(ids: string[]) {
 
-    if (!confirm("Delete this chat?")) return;
+    if (ids.length === 1) {
+      await fetch(`/api/chats/${ids[0]}`, {
 
-    await fetch(`/api/chats/${id}`, {
+        method: "DELETE",
 
-      method: "DELETE",
+        headers: authHeaders(),
 
-      headers: authHeaders(),
+      });
+    } else {
+      await fetch("/api/chats/batch", {
 
-    });
+        method: "DELETE",
 
-    clearDraft(id);
+        headers: authHeaders(),
 
-    if (activeChatId === id) {
+        body: JSON.stringify({ ids }),
 
-      setActiveChatId(null);
-
-      setMessages([]);
-
-      setInput(getPendingDraft());
-
+      });
     }
-
-    loadChats();
-
-  }
-
-
-
-  async function handleBulkDelete() {
-
-    const ids = Array.from(selectedIds);
-
-    if (ids.length === 0) return;
-
-    if (!confirm(`Delete ${ids.length} chat${ids.length > 1 ? "s" : ""}?`)) return;
-
-
-
-    await fetch("/api/chats/batch", {
-
-      method: "DELETE",
-
-      headers: authHeaders(),
-
-      body: JSON.stringify({ ids }),
-
-    });
-
-
 
     clearDrafts(ids);
 
@@ -420,6 +399,36 @@ export default function ChatInterface() {
     setSelectedIds(new Set());
 
     loadChats();
+
+  }
+
+  function handleDeleteChat(id: string) {
+
+    setPendingDelete({ type: "single", ids: [id] });
+
+  }
+
+
+
+  function handleBulkDelete() {
+
+    const ids = Array.from(selectedIds);
+
+    if (ids.length === 0) return;
+
+    setPendingDelete({ type: "bulk", ids });
+
+  }
+
+  async function confirmDeleteChats() {
+
+    if (!pendingDelete) return;
+
+    const ids = pendingDelete.ids;
+
+    setPendingDelete(null);
+
+    await deleteChats(ids);
 
   }
 
@@ -697,6 +706,19 @@ export default function ChatInterface() {
 
         }}
 
+      />
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={pendingDelete?.type === "bulk" ? "Delete selected chats?" : "Delete chat?"}
+        message={
+          pendingDelete?.type === "bulk"
+            ? `This will permanently delete ${pendingDelete.ids.length} selected chat${pendingDelete.ids.length > 1 ? "s" : ""}.`
+            : "This chat and its messages will be permanently deleted."
+        }
+        confirmLabel="Delete"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={confirmDeleteChats}
       />
 
 
