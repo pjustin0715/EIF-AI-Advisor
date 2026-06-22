@@ -314,6 +314,21 @@
             overflow-x: hidden;
         }
 
+        .message--loading {
+            align-items: center;
+        }
+
+        .message-content--loading {
+            display: flex;
+            align-items: center;
+            min-height: 32px;
+            padding-top: 0;
+        }
+
+        .message-content--loading .loading {
+            padding: 0;
+        }
+
         .message-content p {
             margin-top: 0;
             margin-bottom: 12px;
