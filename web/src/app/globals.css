@@ -300,7 +300,16 @@ body {
 .message {
   display: flex;
   gap: 16px;
+  align-items: flex-start;
   line-height: 1.6;
+}
+
+.message--user {
+  align-items: flex-start;
+}
+
+.message--ai {
+  align-items: flex-start;
 }
 
 .avatar {
@@ -329,7 +338,12 @@ body {
 .message-content {
   flex-grow: 1;
   overflow-x: hidden;
-  padding-top: 4px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.message-content > :first-child {
+  margin-top: 0;
 }
 
 .message-content > div > p:first-child,
