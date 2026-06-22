@@ -887,10 +887,10 @@ export default function ChatInterface() {
 
                 {loading && (streamingText || streamingCitations.length > 0) && (
 
-                  <div className="message message--ai">
+                  <div className="message message--ai message--loading">
                     <div className="avatar ai">AI</div>
 
-                    <div className="message-content">
+                    <div className="message-content message-content--loading">
 
                       {streamingText ? (
 
@@ -950,10 +950,10 @@ export default function ChatInterface() {
 
                 {loading && !streamingText && streamingCitations.length === 0 && (
 
-                  <div className="message message--ai">
+                  <div className="message message--ai message--loading">
                     <div className="avatar ai">AI</div>
 
-                    <div className="message-content">
+                    <div className="message-content message-content--loading">
 
                       <div className="loading">
 
