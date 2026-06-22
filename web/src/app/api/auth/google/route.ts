@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       audience: clientId,
     });
     const payload = ticket.getPayload();
-    const email = payload?.email;
+    const email = payload?.email?.trim().toLowerCase();
     const picture = payload?.picture;
 
     if (!email) {
@@ -35,13 +35,20 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getSupabaseAdmin();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("allowed_users")
-      .select("email, is_active")
-      .eq("email", email)
+      .select("*")
+      .ilike("email", email)
       .maybeSingle();
 
-    if (!data || data.is_active === false) {
+    if (error) {
+      console.error("Allowed user lookup failed", error);
+      return NextResponse.json({ detail: "Unable to verify allowed user" }, { status: 500 });
+    }
+
+    const allowedUser = data as { is_active?: boolean } | null;
+
+    if (!allowedUser || allowedUser.is_active === false) {
       return NextResponse.json(
         { detail: "Please sign in with your EIF Google account" },
         { status: 403 }

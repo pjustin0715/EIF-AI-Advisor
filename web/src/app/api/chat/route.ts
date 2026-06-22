@@ -6,6 +6,8 @@ import {
   getGeminiModel,
   MODEL,
 } from "@/lib/gemini";
+import { isDefaultChatTitle } from "@/lib/drafts";
+import { generateChatTitle } from "@/lib/generate-title";
 import { buildSystemPrompt, retrieveContext } from "@/lib/rag-client";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -56,6 +58,10 @@ export async function POST(req: NextRequest) {
     .order("created_at", { ascending: true });
 
   const history = (historyRows || []).slice(-MAX_HISTORY_MESSAGES);
+  const isFirstMessage =
+    history.length === 1 && history[0]?.role === "user";
+  const shouldAutoTitle =
+    isFirstMessage && isDefaultChatTitle(chat.title as string);
 
   let ragContext;
   try {
@@ -143,6 +149,18 @@ export async function POST(req: NextRequest) {
           retrieved_chunk_ids: retrievedChunkIds,
           status: "ok",
         });
+
+        if (shouldAutoTitle) {
+          const newTitle = await generateChatTitle(
+            prompt,
+            chat.advisor_id as string
+          );
+          await supabase
+            .from("chats")
+            .update({ title: newTitle, updated_at: new Date().toISOString() })
+            .eq("id", chat_id);
+          send({ type: "title", title: newTitle });
+        }
 
         send({ type: "done", latency_ms: latencyMs });
       } catch (err) {

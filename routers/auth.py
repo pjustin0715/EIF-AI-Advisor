@@ -25,7 +25,8 @@ def auth_google(request: GoogleAuthRequest):
             google_requests.Request(), 
             os.getenv("GOOGLE_CLIENT_ID")
         )
-        email = idinfo.get("email")
+        raw_email = idinfo.get("email")
+        email = raw_email.strip().lower() if raw_email else None
         picture = idinfo.get("picture")
         if not email:
             raise HTTPException(status_code=400, detail="Email not found in token")
@@ -33,7 +34,7 @@ def auth_google(request: GoogleAuthRequest):
         if supabase:
             from config import logger
             logger.info(f"Authenticating user: {email}")
-            response = supabase.table("allowed_users").select("*").eq("email", email).execute()
+            response = supabase.table("allowed_users").select("*").ilike("email", email).execute()
             if not response.data:
                 raise HTTPException(status_code=403, detail="Please sign in with your EIF Google account")
 

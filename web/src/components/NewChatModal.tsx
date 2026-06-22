@@ -14,7 +14,6 @@ interface Props {
 }
 
 export default function NewChatModal({ open, onClose, onCreated }: Props) {
-  const [title, setTitle] = useState("");
   const [advisorId, setAdvisorId] = useState("");
   const [advisors, setAdvisors] = useState<AdvisorMap>({});
 
@@ -37,11 +36,10 @@ export default function NewChatModal({ open, onClose, onCreated }: Props) {
     const res = await fetch("/api/chats", {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ title: title.trim() || "New Chat", advisor_id: advisorId }),
+      body: JSON.stringify({ title: "New Chat", advisor_id: advisorId }),
     });
     if (res.ok) {
       const chat = await res.json();
-      setTitle("");
       onClose();
       onCreated(chat.id);
     }
@@ -51,12 +49,7 @@ export default function NewChatModal({ open, onClose, onCreated }: Props) {
     <div className="modal-overlay">
       <div className="modal-box">
         <h3>Create New Chat</h3>
-        <input
-          type="text"
-          placeholder="Chat Title (e.g. Help with dashboard)"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
+        <p className="modal-hint">Title is generated automatically from your first message.</p>
         <select value={advisorId} onChange={(e) => setAdvisorId(e.target.value)}>
           {Object.entries(advisors).map(([id, adv]) => (
             <option key={id} value={id}>
