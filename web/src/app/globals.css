@@ -312,6 +312,15 @@ body {
   align-items: flex-start;
 }
 
+.message--loading {
+  align-items: center;
+}
+
+.message--loading .avatar {
+  align-self: center;
+  margin-top: 0;
+}
+
 .avatar {
   width: 32px;
   height: 32px;
@@ -340,6 +349,13 @@ body {
   overflow-x: hidden;
   min-width: 0;
   padding-top: 2px;
+}
+
+.message-content--loading {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding-top: 0;
 }
 
 .message-content > :first-child {
@@ -454,6 +470,7 @@ body {
 .loading {
   display: flex;
   gap: 6px;
+  align-items: center;
 }
 
 .dot {
