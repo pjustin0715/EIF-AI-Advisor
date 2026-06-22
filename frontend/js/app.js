@@ -289,7 +289,7 @@ const API_URL = '';
         function appendLoading() {
             const chatboxInner = document.getElementById('chatbox-inner');
             const msgDiv = document.createElement('div');
-            msgDiv.classList.add('message');
+            msgDiv.classList.add('message', 'message--loading');
             msgDiv.id = 'loading-indicator';
 
             const avatar = document.createElement('div');
@@ -297,7 +297,7 @@ const API_URL = '';
             avatar.innerText = 'AI';
 
             const content = document.createElement('div');
-            content.classList.add('message-content');
+            content.classList.add('message-content', 'message-content--loading');
             content.innerHTML = `
                 <div class="loading">
                     <div class="dot"></div>
