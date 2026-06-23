@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { getAccessToken } from "@/lib/auth-client";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<any[]>([]);
@@ -7,7 +8,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("eif_advisor_token");
+    const token = getAccessToken();
     if (!token) {
       window.location.href = "/";
       return;
