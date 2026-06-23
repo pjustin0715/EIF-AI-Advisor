@@ -100,7 +100,16 @@ export async function POST(req: NextRequest) {
       const encoder = new TextEncoder();
       let fullText = "";
       let completionTokens = 0;
-      let actualModelUsed = MODEL;
+      // Fetch the active model for this advisor, fallback to default MODEL
+      const { data: advisorModel } = await supabase
+        .from("advisor_models")
+        .select("model_name")
+        .eq("advisor_id", chat.advisor_id)
+        .eq("is_active", true)
+        .maybeSingle();
+      
+      const targetModel = advisorModel?.model_name || MODEL;
+      let actualModelUsed = targetModel;
 
       const send = (payload: Record<string, unknown>) => {
         controller.enqueue(
@@ -112,7 +121,7 @@ export async function POST(req: NextRequest) {
         send({ type: "citations", citations, doc_url: docUrl });
 
         const response = await openai.chat.completions.create({
-          model: MODEL,
+          model: targetModel,
           messages: [
             { role: "system", content: systemPrompt },
             ...openAIHistory,
