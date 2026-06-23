@@ -208,7 +208,6 @@ export default function ChatInterface() {
 
     }
 
-    }
   }, []);
 
   useEffect(() => {
