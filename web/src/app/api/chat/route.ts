@@ -3,9 +3,9 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   estimateCost,
   estimateTokens,
-  getGeminiModel,
+  getOpenRouterClient,
   MODEL,
-} from "@/lib/gemini";
+} from "@/lib/llm";
 import { isDefaultChatTitle } from "@/lib/drafts";
 import { generateChatTitle } from "@/lib/generate-title";
 import { buildSystemPrompt, retrieveContext } from "@/lib/rag-client";
@@ -85,12 +85,12 @@ export async function POST(req: NextRequest) {
   const docUrl = ragContext.doc_url ?? null;
   const retrievedChunkIds = ragContext.retrieved_chunk_ids;
 
-  const geminiHistory = history.map((m) => ({
-    role: m.role === "user" ? "user" : "model",
-    parts: [{ text: m.content }],
+  const openAIHistory: any[] = history.map((m) => ({
+    role: m.role === "user" ? "user" : "assistant",
+    content: m.content,
   }));
 
-  const model = getGeminiModel(systemPrompt);
+  const openai = getOpenRouterClient();
   const promptTokenEstimate = estimateTokens(
     systemPrompt + history.map((m) => m.content).join("")
   );
@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
       const encoder = new TextEncoder();
       let fullText = "";
       let completionTokens = 0;
+      let actualModelUsed = MODEL;
 
       const send = (payload: Record<string, unknown>) => {
         controller.enqueue(
@@ -110,12 +111,20 @@ export async function POST(req: NextRequest) {
       try {
         send({ type: "citations", citations, doc_url: docUrl });
 
-        const result = await model.generateContentStream({
-          contents: geminiHistory,
+        const response = await openai.chat.completions.create({
+          model: MODEL,
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...openAIHistory,
+          ],
+          stream: true,
         });
 
-        for await (const chunk of result.stream) {
-          const text = chunk.text();
+        for await (const chunk of response) {
+          if (chunk.model) {
+            actualModelUsed = chunk.model;
+          }
+          const text = chunk.choices[0]?.delta?.content || "";
           if (text) {
             fullText += text;
             completionTokens += estimateTokens(text);
@@ -132,7 +141,7 @@ export async function POST(req: NextRequest) {
 
         const latencyMs = Date.now() - startTime;
         const estCost = estimateCost(
-          MODEL,
+          actualModelUsed,
           promptTokenEstimate,
           completionTokens
         );
@@ -141,7 +150,7 @@ export async function POST(req: NextRequest) {
           conversation_id: chat_id,
           user_email: userEmail,
           advisor_id: chat.advisor_id,
-          model: MODEL,
+          model: actualModelUsed,
           prompt_tokens: promptTokenEstimate,
           completion_tokens: completionTokens,
           est_cost_usd: estCost,

@@ -84,6 +84,17 @@ type PendingDelete =
 export default function ChatInterface() {
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const checkAdminRole = (token: string | null) => {
+    if (!token) return false;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.role === "admin";
+    } catch {
+      return false;
+    }
+  };
 
   const [chats, setChats] = useState<Chat[]>([]);
 
@@ -197,19 +208,18 @@ export default function ChatInterface() {
 
     }
 
-
-
+    }
   }, []);
 
   useEffect(() => {
-    if (getAccessToken()) {
-
+    const token = getAccessToken();
+    if (token) {
       setIsAuthenticated(true);
+      setIsAdmin(checkAdminRole(token));
 
       loadChats();
 
       fetch("/api/auth/config")
-
         .then((r) => r.json())
 
         .then((c) => setDnaDocUrl(c.dna_doc_url ?? null))
@@ -681,9 +691,9 @@ export default function ChatInterface() {
         <LoginOverlay
 
           onLogin={() => {
-
+            const token = getAccessToken();
             setIsAuthenticated(true);
-
+            setIsAdmin(checkAdminRole(token));
             loadChats();
 
           }}
@@ -765,7 +775,19 @@ export default function ChatInterface() {
 
           </div>
 
-          {isAuthenticated && <LogoutButton onLogout={handleLogout} />}
+          {isAuthenticated && (
+            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+              {isAdmin && (
+                <button
+                  className="logout-btn"
+                  onClick={() => window.location.href = '/admin'}
+                >
+                  Admin Dashboard
+                </button>
+              )}
+              <LogoutButton onLogout={handleLogout} />
+            </div>
+          )}
 
         </div>
 
