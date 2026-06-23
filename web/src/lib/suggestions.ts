@@ -9,6 +9,12 @@ export interface Suggestion {
   query: string;
 }
 
+export const ADVISOR_GREETINGS: Record<string, string> = {
+  advisor1: "Hi! Need help structuring or designing a data dashboard?",
+  advisor2: "Hi! Want to create a Single Source of Truth memo or process documentation?",
+  advisor3: "Hi! Need help building data models or star schemas?",
+};
+
 /** Curated starter prompts derived from EIF documentation and eval golden set. */
 export const ADVISOR_SUGGESTIONS: Record<string, Suggestion[]> = {
   advisor1: [

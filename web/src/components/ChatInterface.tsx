@@ -36,7 +36,7 @@ import {
 
 } from "@/lib/drafts";
 
-import { ADVISOR_NAMES, getSuggestions } from "@/lib/suggestions";
+import { ADVISOR_NAMES, ADVISOR_GREETINGS, getSuggestions } from "@/lib/suggestions";
 
 import EmptyChatState from "./EmptyChatState";
 
@@ -862,7 +862,7 @@ export default function ChatInterface() {
 
                         <div className="message-content">
 
-                          <p>Hi! How can I assist you today?</p>
+                          <p>{ADVISOR_GREETINGS[activeAdvisorId] || "Hi! How can I assist you today?"}</p>
 
                           {messages.length === 0 && (
                             <>
