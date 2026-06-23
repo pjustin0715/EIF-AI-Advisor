@@ -13,10 +13,10 @@ class Settings(BaseSettings):
     supabase_key: str = ""
     google_service_account_json: str = ""
 
-    doc_id_company_dna: str = "13cMCqZc_c-TrTo0k9t1BxrdjYwxNk_n9FP-Eax-Wj9k"
-    doc_id_advisor1: str = "1xcnZwd30_WxBWf5nfBLORhKMvRm1MmP1jPUqviTKM_o"
-    doc_id_advisor2: str = "1uCi5IrVG6ETHD_LSKRdMism9QDT-XRHGlaYjvokTwXM"
-    doc_id_advisor3: str = "1wtF_xLiTHo7xUPx7tKAqV1i8NQ8b2VXRV_-aqdxaWBI"
+    doc_id_company_dna: str = ""
+    doc_id_advisor1: str = ""
+    doc_id_advisor2: str = ""
+    doc_id_advisor3: str = ""
 
     embedding_model: str = "gemini-embedding-001"
     embedding_dimensions: int = 768
