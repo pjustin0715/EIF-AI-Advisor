@@ -851,43 +851,46 @@ export default function ChatInterface() {
 
                   <div className="empty-chat">Select or create a chat to begin.</div>
 
-                ) : messages.length === 0 ? (
+                ) : (
 
-                  <div className="thread-welcome">
+                  <>
+                    <div className="thread-welcome">
 
-                    <div className="message">
+                      <div className="message message--ai">
 
-                      <div className="avatar ai">AI</div>
+                        <div className="avatar ai">AI</div>
 
-                      <div className="message-content">
+                        <div className="message-content">
 
-                        <p>Hi! How can I assist you today?</p>
+                          <p>Hi! How can I assist you today?</p>
 
-                        <p className="thread-welcome-hint">
+                          {messages.length === 0 && (
+                            <>
+                              <p className="thread-welcome-hint">
 
-                          Try one of these questions based on EIF documentation:
+                                Try one of these questions based on EIF documentation:
 
-                        </p>
+                              </p>
 
-                        <SuggestionChips
+                              <SuggestionChips
 
-                          suggestions={threadSuggestions}
+                                suggestions={threadSuggestions}
 
-                          onSelect={(query) => sendMessage(query)}
+                                onSelect={(query) => sendMessage(query)}
 
-                          disabled={loading}
+                                disabled={loading}
 
-                        />
+                              />
+                            </>
+                          )}
+
+                        </div>
 
                       </div>
 
                     </div>
 
-                  </div>
-
-                ) : (
-
-                  messages.map((msg, idx) => (
+                    {messages.map((msg, idx) => (
 
                     <div
                       key={idx}
@@ -931,8 +934,8 @@ export default function ChatInterface() {
 
                     </div>
 
-                  ))
-
+                  ))}
+                  </>
                 )}
 
                 {loading && (streamingText || streamingCitations.length > 0) && (
