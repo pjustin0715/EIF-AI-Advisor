@@ -6,6 +6,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 from config import get_settings
+from services.db import get_supabase
 
 DOCS_SCOPES = ["https://www.googleapis.com/auth/documents.readonly"]
 _docs_service = None
@@ -18,6 +19,15 @@ def get_docs_service():
 
     settings = get_settings()
     sa_json = settings.google_service_account_json
+    if not sa_json:
+        try:
+            supabase = get_supabase()
+            resp = supabase.table("documents").select("voice_digest").eq("doc_id", "__internal_google_sa_json").limit(1).execute()
+            if resp.data and resp.data[0].get("voice_digest"):
+                sa_json = resp.data[0]["voice_digest"]
+        except Exception as e:
+            print(f"Failed to fetch fallback service account from db: {e}")
+
     if sa_json:
         try:
             creds_info = json.loads(sa_json)
