@@ -19,25 +19,34 @@ def get_docs_service():
 
     settings = get_settings()
     sa_json = settings.google_service_account_json
-    if not sa_json:
-        try:
-            supabase = get_supabase()
-            resp = supabase.table("documents").select("voice_digest").eq("doc_id", "__internal_google_sa_json").limit(1).execute()
-            if resp.data and resp.data[0].get("voice_digest"):
-                sa_json = resp.data[0]["voice_digest"]
-        except Exception as e:
-            print(f"Failed to fetch fallback service account from db: {e}")
+    
+    creds_info = None
 
     if sa_json:
         try:
             creds_info = json.loads(sa_json)
+        except Exception as e:
+            print(f"Provided sa_json is invalid, falling back to db: {e}")
+
+    if not creds_info:
+        try:
+            supabase = get_supabase()
+            resp = supabase.table("documents").select("voice_digest").eq("doc_id", "__internal_google_sa_json").limit(1).execute()
+            if resp.data and resp.data[0].get("voice_digest"):
+                fallback_json = resp.data[0]["voice_digest"]
+                creds_info = json.loads(fallback_json)
+        except Exception as e:
+            print(f"Failed to fetch fallback service account from db: {e}")
+
+    if creds_info:
+        try:
             creds = service_account.Credentials.from_service_account_info(
                 creds_info, scopes=DOCS_SCOPES
             )
             _docs_service = build("docs", "v1", credentials=creds)
             return _docs_service
         except Exception as exc:
-            print(f"Failed to load service account from env: {exc}")
+            print(f"Failed to load service account from info: {exc}")
 
     if os.path.exists("service_account.json"):
         creds = service_account.Credentials.from_service_account_file(
