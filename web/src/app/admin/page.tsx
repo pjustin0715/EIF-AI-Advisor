@@ -14,6 +14,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingModel, setSavingModel] = useState<string | null>(null);
+  const [clearingCache, setClearingCache] = useState(false);
 
   const fetchDashboardData = async (token: string) => {
     try {
@@ -80,6 +81,30 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleClearCache = async () => {
+    const token = getAccessToken();
+    if (!token) return;
+    
+    setClearingCache(true);
+    try {
+      const res = await fetch("/api/admin/cache", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        alert("Cache cleared successfully. AI prompts and DNA docs have been refreshed.");
+      } else {
+        const data = await res.json();
+        alert(`Failed to clear cache: ${data.error || "Unknown error"}`);
+      }
+    } catch (e) {
+      console.error("Failed to clear cache", e);
+      alert("An error occurred while clearing the cache.");
+    } finally {
+      setClearingCache(false);
+    }
+  };
+
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading Admin Dashboard...</div>;
   if (error) return <div style={{ padding: 40, color: "red", textAlign: "center" }}>{error}</div>;
 
@@ -101,12 +126,21 @@ export default function AdminDashboard() {
             <h1 style={{ margin: 0, color: "#3b0692", fontSize: "2rem" }}>Admin Dashboard</h1>
             <p style={{ margin: "8px 0 0", color: "#758696" }}>Monitor AI model usage and configure advisor settings.</p>
           </div>
-          <button 
-            onClick={() => window.location.href = "/"}
-            style={{ padding: "10px 20px", borderRadius: 8, background: "#f3f5fb", border: "1px solid #e7eaee", cursor: "pointer", fontWeight: 600, color: "#404040" }}
-          >
-            Return to Chat
-          </button>
+          <div style={{ display: "flex", gap: 12 }}>
+            <button 
+              onClick={handleClearCache}
+              disabled={clearingCache}
+              style={{ padding: "10px 20px", borderRadius: 8, background: "#fff", border: "1px solid #e7eaee", cursor: clearingCache ? "not-allowed" : "pointer", fontWeight: 600, color: "#d93025" }}
+            >
+              {clearingCache ? "Clearing..." : "Clear Prompt Cache"}
+            </button>
+            <button 
+              onClick={() => window.location.href = "/"}
+              style={{ padding: "10px 20px", borderRadius: 8, background: "#f3f5fb", border: "1px solid #e7eaee", cursor: "pointer", fontWeight: 600, color: "#404040" }}
+            >
+              Return to Chat
+            </button>
+          </div>
         </div>
 
         <div style={{ marginBottom: 40 }}>
