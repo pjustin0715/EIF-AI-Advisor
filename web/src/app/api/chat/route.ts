@@ -111,6 +111,11 @@ export async function POST(req: NextRequest) {
       const targetModel = advisorModel?.model_name || MODEL;
       let actualModelUsed = targetModel;
 
+      let titlePromise: Promise<string> | null = null;
+      if (shouldAutoTitle) {
+        titlePromise = generateChatTitle(prompt, chat.advisor_id as string);
+      }
+
       const send = (payload: Record<string, unknown>) => {
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)
@@ -168,11 +173,8 @@ export async function POST(req: NextRequest) {
           status: "ok",
         });
 
-        if (shouldAutoTitle) {
-          const newTitle = await generateChatTitle(
-            prompt,
-            chat.advisor_id as string
-          );
+        if (titlePromise) {
+          const newTitle = await titlePromise;
           await supabase
             .from("chats")
             .update({ title: newTitle, updated_at: new Date().toISOString() })
