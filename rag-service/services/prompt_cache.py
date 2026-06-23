@@ -28,10 +28,14 @@ def get_advisor_prompt(advisor_id: str) -> str:
     now = time.time()
     ttl = settings.cache_ttl_seconds
 
+    if cached and (now - cached.fetched_at) < ttl:
+        return cached.text
+
     metadata = fetch_doc_metadata(doc_id)
     revision_id = metadata.get("revision_id", "unknown")
 
-    if cached and cached.revision_id == revision_id and (now - cached.fetched_at) < ttl:
+    if cached and cached.revision_id == revision_id:
+        cached.fetched_at = now
         return cached.text
 
     text = fetch_doc_text(doc_id)

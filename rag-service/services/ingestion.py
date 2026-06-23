@@ -11,6 +11,8 @@ from services.voice_digest import generate_voice_digest
 
 DNA_DOC_KEY = "company_dna"
 
+_dna_metadata_cache: dict[str, Any] = {"revision_id": None, "fetched_at": 0.0}
+
 
 @dataclass
 class IngestResult:
@@ -37,8 +39,16 @@ def ingest_dna(force: bool = False) -> IngestResult:
     if not doc_id:
         raise ValueError("DOC_ID_COMPANY_DNA is not configured")
 
-    metadata = fetch_doc_metadata(doc_id)
-    revision_id = metadata.get("revision_id", "unknown")
+    now = time.time()
+    ttl = settings.cache_ttl_seconds
+
+    if not force and _dna_metadata_cache["revision_id"] is not None and (now - _dna_metadata_cache["fetched_at"]) < ttl:
+        revision_id = _dna_metadata_cache["revision_id"]
+    else:
+        metadata = fetch_doc_metadata(doc_id)
+        revision_id = metadata.get("revision_id", "unknown")
+        _dna_metadata_cache["revision_id"] = revision_id
+        _dna_metadata_cache["fetched_at"] = now
     supabase = get_supabase()
 
     existing_resp = (
