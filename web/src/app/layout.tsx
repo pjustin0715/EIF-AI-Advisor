@@ -23,7 +23,6 @@ export default function RootLayout({
           src="https://accounts.google.com/gsi/client"
           strategy="beforeInteractive"
         />
-        <ChatInterface />
         {children}
       </body>
     </html>
