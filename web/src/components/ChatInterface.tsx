@@ -96,6 +96,8 @@ export default function ChatInterface() {
     }
   };
 
+  const [chatsLoading, setChatsLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
 
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -118,8 +120,6 @@ export default function ChatInterface() {
 
   const [streamingCitations, setStreamingCitations] = useState<string[]>([]);
 
-  const [dnaDocUrl, setDnaDocUrl] = useState<string | null>(null);
-
   const [selectMode, setSelectMode] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -140,7 +140,7 @@ export default function ChatInterface() {
 
 
 
-  const showEmptyState = isAuthenticated && chats.length === 0;
+  const showEmptyState = isAuthenticated && !chatsLoading && chats.length === 0;
 
 
 
@@ -157,10 +157,14 @@ export default function ChatInterface() {
 
 
   const loadMessages = useCallback(async (chatId: string) => {
+    setMessagesLoading(true);
 
     const res = await fetch(`/api/chats/${chatId}`, { headers: authHeaders() });
 
-    if (!res.ok) return;
+    if (!res.ok) {
+      setMessagesLoading(false);
+      return;
+    }
 
     const data = await res.json();
 
@@ -175,12 +179,14 @@ export default function ChatInterface() {
       setAdvisorName(ADVISOR_NAMES[advId] || "AI Advisor");
 
     }
+    setMessagesLoading(false);
 
   }, []);
 
 
 
   const loadChats = useCallback(async () => {
+    setChatsLoading(true);
 
     const res = await fetch("/api/chats", { headers: authHeaders() });
 
@@ -189,6 +195,7 @@ export default function ChatInterface() {
       clearAccessToken();
 
       setIsAuthenticated(false);
+      setChatsLoading(false);
 
       return;
 
@@ -207,6 +214,7 @@ export default function ChatInterface() {
       }
 
     }
+    setChatsLoading(false);
 
   }, []);
 
@@ -218,13 +226,8 @@ export default function ChatInterface() {
 
       loadChats();
 
-      fetch("/api/auth/config")
-        .then((r) => r.json())
-
-        .then((c) => setDnaDocUrl(c.dna_doc_url ?? null))
-
-        .catch(() => {});
-
+    } else {
+      setChatsLoading(false);
     }
 
   }, [loadChats]);
@@ -792,7 +795,15 @@ export default function ChatInterface() {
 
 
 
-        {showEmptyState ? (
+        {(chatsLoading || messagesLoading) ? (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div className="loading">
+              <div className="dot" />
+              <div className="dot" />
+              <div className="dot" />
+            </div>
+          </div>
+        ) : showEmptyState ? (
 
           <EmptyChatState
 
@@ -900,26 +911,6 @@ export default function ChatInterface() {
 
                         />
 
-                        {msg.role !== "user" && dnaDocUrl && (
-
-                          <a
-
-                            href={dnaDocUrl}
-
-                            target="_blank"
-
-                            rel="noopener noreferrer"
-
-                            className="doc-link"
-
-                          >
-
-                            View source document →
-
-                          </a>
-
-                        )}
-
                       </div>
 
                     </div>
@@ -937,40 +928,11 @@ export default function ChatInterface() {
 
                       {streamingText ? (
 
-                        <>
-
                           <div
-
                             dangerouslySetInnerHTML={{
-
                               __html: marked.parse(streamingText),
-
                             }}
-
                           />
-
-                          {dnaDocUrl && (
-
-                            <a
-
-                              href={dnaDocUrl}
-
-                              target="_blank"
-
-                              rel="noopener noreferrer"
-
-                              className="doc-link"
-
-                            >
-
-                              View source document →
-
-                            </a>
-
-                          )}
-
-                        </>
-
                       ) : (
 
                         <div className="loading">
