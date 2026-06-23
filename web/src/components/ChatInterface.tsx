@@ -720,12 +720,15 @@ export default function ChatInterface() {
 
         onClose={() => setModalOpen(false)}
 
-        onCreated={(id) => {
+        onCreated={(id, advisorId) => {
 
           loadChats();
 
           skipLoadRef.current = true;
           setMessages([]);
+
+          setActiveAdvisorId(advisorId);
+          setAdvisorName(ADVISOR_NAMES[advisorId] || "AI Advisor");
 
           setActiveChatId(id);
 

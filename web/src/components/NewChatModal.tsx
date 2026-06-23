@@ -10,7 +10,7 @@ interface AdvisorMap {
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCreated: (chatId: string) => void;
+  onCreated: (chatId: string, advisorId: string) => void;
 }
 
 export default function NewChatModal({ open, onClose, onCreated }: Props) {
@@ -41,7 +41,7 @@ export default function NewChatModal({ open, onClose, onCreated }: Props) {
     if (res.ok) {
       const chat = await res.json();
       onClose();
-      onCreated(chat.id);
+      onCreated(chat.id, chat.advisor_id);
     }
   }
 
