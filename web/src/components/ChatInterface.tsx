@@ -138,6 +138,8 @@ export default function ChatInterface() {
 
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const skipLoadRef = useRef(false);
+
 
 
   const showEmptyState = isAuthenticated && !chatsLoading && chats.length === 0;
@@ -267,6 +269,11 @@ export default function ChatInterface() {
   useEffect(() => {
 
     if (!activeChatId || !isAuthenticated) return;
+
+    if (skipLoadRef.current) {
+      skipLoadRef.current = false;
+      return;
+    }
 
     loadMessages(activeChatId);
 
@@ -481,6 +488,9 @@ export default function ChatInterface() {
     if (!res.ok) return null;
 
     const chat = await res.json();
+
+    skipLoadRef.current = true;
+    setMessages([]);
 
     setActiveChatId(chat.id);
 
@@ -713,6 +723,9 @@ export default function ChatInterface() {
         onCreated={(id) => {
 
           loadChats();
+
+          skipLoadRef.current = true;
+          setMessages([]);
 
           setActiveChatId(id);
 
