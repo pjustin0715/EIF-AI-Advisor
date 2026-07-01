@@ -14,9 +14,8 @@ class Settings(BaseSettings):
     google_service_account_json: str = ""
 
     doc_id_company_dna: str = ""
-    doc_id_advisor1: str = ""
-    doc_id_advisor2: str = ""
-    doc_id_advisor3: str = ""
+
+    spreadsheet_id: str = ""
 
     embedding_model: str = "gemini-embedding-001"
     embedding_dimensions: int = 768
@@ -37,18 +36,3 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     return Settings()
 
-
-ADVISORS = {
-    "advisor1": {
-        "name": "Data Dashboard Advisor",
-        "doc_id_env": "doc_id_advisor1",
-    },
-    "advisor2": {
-        "name": "SSOT Memo Advisor",
-        "doc_id_env": "doc_id_advisor2",
-    },
-    "advisor3": {
-        "name": "Data Modeling Advisor",
-        "doc_id_env": "doc_id_advisor3",
-    },
-}

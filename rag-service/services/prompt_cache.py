@@ -1,8 +1,9 @@
 import time
 from dataclasses import dataclass
 
-from config import ADVISORS, get_settings
+from config import get_settings
 from services.docs import fetch_doc_metadata, fetch_doc_text
+from services.sheets import get_advisors
 
 
 @dataclass
@@ -17,9 +18,15 @@ _advisor_cache: dict[str, CachedPrompt] = {}
 
 def get_advisor_prompt(advisor_id: str) -> str:
     settings = get_settings()
-    safe_id = advisor_id if advisor_id in ADVISORS else "advisor1"
-    advisor = ADVISORS[safe_id]
-    doc_id = getattr(settings, advisor["doc_id_env"], "")
+    advisors = get_advisors()
+    
+    # Fallback to first available advisor if ID is invalid
+    safe_id = advisor_id if advisor_id in advisors else (list(advisors.keys())[0] if advisors else "")
+    if not safe_id:
+        return ""
+        
+    advisor = advisors[safe_id]
+    doc_id = advisor.get("doc_id", "")
 
     if not doc_id:
         return ""

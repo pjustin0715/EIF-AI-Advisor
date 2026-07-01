@@ -115,6 +115,7 @@ export default function ChatInterface() {
   const [activeAdvisorId, setActiveAdvisorId] = useState("advisor1");
 
   const [emptyAdvisorId, setEmptyAdvisorId] = useState("advisor1");
+  const [advisorMap, setAdvisorMap] = useState<Record<string, { name: string, purpose?: string }>>({});
 
   const [streamingText, setStreamingText] = useState("");
 
@@ -178,7 +179,7 @@ export default function ChatInterface() {
 
       setActiveAdvisorId(advId);
 
-      setAdvisorName(ADVISOR_NAMES[advId] || "AI Advisor");
+      setAdvisorName(advisorMap[advId]?.name || "AI Advisor");
 
     }
     setMessagesLoading(false);
@@ -221,10 +222,21 @@ export default function ChatInterface() {
   }, []);
 
   useEffect(() => {
+    if (activeAdvisorId && advisorMap[activeAdvisorId]) {
+      setAdvisorName(advisorMap[activeAdvisorId].name);
+    }
+  }, [activeAdvisorId, advisorMap]);
+
+  useEffect(() => {
     const token = getAccessToken();
     if (token) {
       setIsAuthenticated(true);
       setIsAdmin(checkAdminRole(token));
+      
+      fetch("/api/advisors")
+        .then(r => r.json())
+        .then(data => setAdvisorMap(data))
+        .catch(() => {});
 
       loadChats();
       fetch("/api/wakeup").catch(() => {});
@@ -499,7 +511,7 @@ export default function ChatInterface() {
 
     setActiveAdvisorId(advisorId);
 
-    setAdvisorName(ADVISOR_NAMES[advisorId] || "AI Advisor");
+    setAdvisorName(advisorMap[advisorId]?.name || "AI Advisor");
 
     clearPendingDraft();
 
@@ -729,7 +741,7 @@ export default function ChatInterface() {
           setMessages([]);
 
           setActiveAdvisorId(advisorId);
-          setAdvisorName(ADVISOR_NAMES[advisorId] || "AI Advisor");
+          setAdvisorName(advisorMap[advisorId]?.name || "AI Advisor");
 
           setActiveChatId(id);
 

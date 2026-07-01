@@ -3,10 +3,11 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from config import ADVISORS, get_settings
+from config import get_settings
 from services.ingestion import reindex_all
 from services.prompt_cache import get_advisor_prompt, invalidate_advisor_cache
 from services.retrieval import retrieve_context
+from services.sheets import get_advisors
 
 router = APIRouter()
 
@@ -39,10 +40,11 @@ class ReindexResponse(BaseModel):
 @router.post("/retrieve", response_model=RetrieveResponse)
 def retrieve(
     body: RetrieveRequest,
-    advisor_id: str = "advisor1",
+    advisor_id: str,
     _: None = Depends(verify_service_secret),
 ):
-    if advisor_id not in ADVISORS:
+    advisors = get_advisors()
+    if advisor_id not in advisors:
         raise HTTPException(status_code=400, detail="Invalid advisor ID")
 
     result = retrieve_context(body.query)
@@ -77,17 +79,28 @@ def retrieve(
 
 @router.get("/prompts/{advisor_id}")
 def get_prompts(advisor_id: str, _: None = Depends(verify_service_secret)):
-    if advisor_id not in ADVISORS:
+    advisors = get_advisors()
+    if advisor_id not in advisors:
         raise HTTPException(status_code=400, detail="Invalid advisor ID")
     return {
         "advisor_id": advisor_id,
-        "name": ADVISORS[advisor_id]["name"],
+        "name": advisors[advisor_id]["name"],
         "prompt": get_advisor_prompt(advisor_id),
     }
 
 
+@router.get("/advisors")
+def list_advisors(_: None = Depends(verify_service_secret)):
+    advisors = get_advisors()
+    # Filter to only active advisors
+    active_advisors = [adv for adv in advisors.values() if adv["is_active"]]
+    return {"advisors": active_advisors}
+
+
 @router.post("/reindex", response_model=ReindexResponse)
 def reindex(force: bool = True, _: None = Depends(verify_service_secret)):
+    # Force refresh the Sheets cache on reindex
+    get_advisors(force_refresh=True)
     invalidate_advisor_cache()
     results = reindex_all(force=force)
     return ReindexResponse(status="ok", results=results)

@@ -7,8 +7,36 @@ from googleapiclient.discovery import build
 
 from config import get_settings
 
-DOCS_SCOPES = ["https://www.googleapis.com/auth/documents.readonly"]
+SCOPES = [
+    "https://www.googleapis.com/auth/documents.readonly",
+    "https://www.googleapis.com/auth/spreadsheets.readonly"
+]
 _docs_service = None
+_creds = None
+
+
+def get_google_creds():
+    global _creds
+    if _creds:
+        return _creds
+
+    settings = get_settings()
+    sa_json = settings.google_service_account_json
+    if sa_json:
+        try:
+            creds_info = json.loads(sa_json)
+            _creds = service_account.Credentials.from_service_account_info(
+                creds_info, scopes=SCOPES
+            )
+            return _creds
+        except Exception as exc:
+            print(f"Failed to load service account from env: {exc}")
+
+    if os.path.exists("service_account.json"):
+        _creds = service_account.Credentials.from_service_account_file(
+            "service_account.json", scopes=SCOPES
+        )
+    return _creds
 
 
 def get_docs_service():
@@ -16,23 +44,8 @@ def get_docs_service():
     if _docs_service:
         return _docs_service
 
-    settings = get_settings()
-    sa_json = settings.google_service_account_json
-    if sa_json:
-        try:
-            creds_info = json.loads(sa_json)
-            creds = service_account.Credentials.from_service_account_info(
-                creds_info, scopes=DOCS_SCOPES
-            )
-            _docs_service = build("docs", "v1", credentials=creds)
-            return _docs_service
-        except Exception as exc:
-            print(f"Failed to load service account from env: {exc}")
-
-    if os.path.exists("service_account.json"):
-        creds = service_account.Credentials.from_service_account_file(
-            "service_account.json", scopes=DOCS_SCOPES
-        )
+    creds = get_google_creds()
+    if creds:
         _docs_service = build("docs", "v1", credentials=creds)
     return _docs_service
 
