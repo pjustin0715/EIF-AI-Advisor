@@ -8,7 +8,8 @@ export async function GET() {
     const secret = process.env.RAG_SERVICE_SECRET || "";
     
     const res = await fetch(`${baseUrl}/advisors`, {
-      headers: secret ? { "X-RAG-Secret": secret } : {}
+      headers: secret ? { "X-RAG-Secret": secret } : {},
+      cache: 'no-store'
     });
     
     if (!res.ok) {
