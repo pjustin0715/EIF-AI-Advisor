@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const baseUrl = process.env.RAG_SERVICE_URL || "http://localhost:8001";
