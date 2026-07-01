@@ -227,6 +227,7 @@ export default function ChatInterface() {
       setIsAdmin(checkAdminRole(token));
 
       loadChats();
+      fetch("/api/wakeup").catch(() => {});
 
     } else {
       setChatsLoading(false);
@@ -767,7 +768,10 @@ export default function ChatInterface() {
 
           onDelete={handleDeleteChat}
 
-          onNewChat={() => setModalOpen(true)}
+          onNewChat={() => {
+            setModalOpen(true);
+            fetch("/api/wakeup").catch(() => {});
+          }}
 
           onToggleSelectMode={handleToggleSelectMode}
 
