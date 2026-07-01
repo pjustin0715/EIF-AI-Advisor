@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { ADVISORS, getSupabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { title, advisor_id } = body;
 
-  if (!advisor_id || !ADVISORS[advisor_id]) {
-    return NextResponse.json({ error: "Invalid advisor ID" }, { status: 400 });
+  if (!advisor_id) {
+    return NextResponse.json({ error: "Missing advisor ID" }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();
