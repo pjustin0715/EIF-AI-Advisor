@@ -2,12 +2,13 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from config import ADVISORS, get_settings
+from config import get_settings
 from services.docs import fetch_doc_metadata, fetch_doc_text
 from services.embeddings import EmbeddingService
 from services.chunker import chunk_document
 from services.db import get_supabase
 from services.voice_digest import generate_voice_digest
+from services.sheets import get_advisors
 
 DNA_DOC_KEY = "company_dna"
 
@@ -27,9 +28,10 @@ def _resolve_doc_id(kind: str, advisor_id: str | None = None) -> str:
     settings = get_settings()
     if kind == "dna":
         return settings.doc_id_company_dna
-    if advisor_id and advisor_id in ADVISORS:
-        env_key = ADVISORS[advisor_id]["doc_id_env"]
-        return getattr(settings, env_key, "")
+    if advisor_id:
+        advisors = get_advisors()
+        if advisor_id in advisors:
+            return advisors[advisor_id].get("doc_id", "")
     return ""
 
 
