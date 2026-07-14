@@ -467,13 +467,23 @@ export default function ChatInterface() {
 
 
   function updateChatTitle(chatId: string, title: string) {
+    setChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, title } : c)));
+  }
 
-    setChats((prev) =>
+  async function handleShare(id: string) {
+    const res = await fetch("/api/share", { method: "POST", headers: authHeaders(), body: JSON.stringify({ chat_id: id }) });
+    if (res.ok) {
+      const { share_token } = await res.json();
+      navigator.clipboard.writeText(`${window.location.origin}/share/${share_token}`);
+      alert("Share link copied to clipboard!");
+    }
+  }
 
-      prev.map((c) => (c.id === chatId ? { ...c, title } : c))
-
-    );
-
+  async function handleRename(id: string) {
+    const newTitle = prompt("Enter new chat name:");
+    if (!newTitle) return;
+    const res = await fetch(`/api/chats/${id}`, { method: "PATCH", headers: authHeaders(), body: JSON.stringify({ title: newTitle }) });
+    if (res.ok) updateChatTitle(id, newTitle);
   }
 
 
@@ -790,11 +800,10 @@ export default function ChatInterface() {
           onToggleSelect={handleToggleSelect}
 
           onSelectAll={handleSelectAll}
-
           onBulkDelete={handleBulkDelete}
-
+          onShare={handleShare}
+          onRename={handleRename}
         />
-
       )}
 
 

@@ -56,3 +56,37 @@ export async function DELETE(
   await supabase.from("chats").delete().eq("id", params.id);
   return NextResponse.json({ status: "success" });
 }
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const user = await getCurrentUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { title } = await req.json();
+  if (!title) {
+    return NextResponse.json({ error: "Missing title" }, { status: 400 });
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data: chat } = await supabase
+    .from("chats")
+    .select("id")
+    .eq("id", params.id)
+    .eq("user_email", user.email)
+    .maybeSingle();
+
+  if (!chat) {
+    return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+  }
+
+  await supabase
+    .from("chats")
+    .update({ title, updated_at: new Date().toISOString() })
+    .eq("id", params.id);
+
+  return NextResponse.json({ status: "success" });
+}

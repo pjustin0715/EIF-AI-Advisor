@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 
 interface Chat {
   id: string;
@@ -17,6 +18,8 @@ interface Props {
   onToggleSelect: (id: string) => void;
   onSelectAll: () => void;
   onBulkDelete: () => void;
+  onShare: (id: string) => void;
+  onRename: (id: string) => void;
 }
 
 export default function Sidebar({
@@ -31,8 +34,12 @@ export default function Sidebar({
   onToggleSelect,
   onSelectAll,
   onBulkDelete,
+  onShare,
+  onRename,
 }: Props) {
   const selectedCount = selectedIds.size;
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+
 
   return (
     <div className="sidebar">
@@ -113,17 +120,41 @@ export default function Sidebar({
                 )}
                 <span className="chat-title">{chat.title}</span>
                 {!selectMode && (
-                  <button
-                    className="delete-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(chat.id);
-                    }}
-                    type="button"
-                    aria-label="Delete chat"
-                  >
-                    ✕
-                  </button>
+                  <div className="chat-options-container" style={{ position: "relative" }}>
+                    <button
+                      className="options-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenDropdownId(openDropdownId === chat.id ? null : chat.id);
+                      }}
+                      type="button"
+                      aria-label="Chat options"
+                    >
+                      ...
+                    </button>
+                    {openDropdownId === chat.id && (
+                      <div className="dropdown-menu" style={{ position: "absolute", right: 0, top: "100%", background: "#222", border: "1px solid #444", borderRadius: 4, zIndex: 10, padding: 4 }}>
+                        <button
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "4px 8px", background: "none", border: "none", color: "white", cursor: "pointer" }}
+                          onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); onShare(chat.id); }}
+                        >
+                          Share
+                        </button>
+                        <button
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "4px 8px", background: "none", border: "none", color: "white", cursor: "pointer" }}
+                          onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); onRename(chat.id); }}
+                        >
+                          Rename
+                        </button>
+                        <button
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "4px 8px", background: "none", border: "none", color: "#ff4444", cursor: "pointer" }}
+                          onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); onDelete(chat.id); }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             );
