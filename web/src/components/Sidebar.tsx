@@ -133,21 +133,36 @@ export default function Sidebar({
                       ...
                     </button>
                     {openDropdownId === chat.id && (
-                      <div className="dropdown-menu" style={{ position: "absolute", right: 0, top: "100%", background: "#222", border: "1px solid #444", borderRadius: 4, zIndex: 10, padding: 4 }}>
+                      <div className="dropdown-menu" style={{ 
+                        position: "absolute", right: 0, top: "100%", 
+                        background: "var(--bg-color)", 
+                        border: "1px solid var(--sidebar-border)", 
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                        borderRadius: "8px", 
+                        zIndex: 10, 
+                        padding: "4px",
+                        minWidth: "120px"
+                      }}>
                         <button
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "4px 8px", background: "none", border: "none", color: "white", cursor: "pointer" }}
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none", color: "var(--text-main)", cursor: "pointer", borderRadius: "4px" }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = "var(--item-hover)"}
+                          onMouseLeave={(e) => e.currentTarget.style.background = "none"}
                           onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); onShare(chat.id); }}
                         >
                           Share
                         </button>
                         <button
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "4px 8px", background: "none", border: "none", color: "white", cursor: "pointer" }}
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none", color: "var(--text-main)", cursor: "pointer", borderRadius: "4px" }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = "var(--item-hover)"}
+                          onMouseLeave={(e) => e.currentTarget.style.background = "none"}
                           onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); onRename(chat.id); }}
                         >
                           Rename
                         </button>
                         <button
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "4px 8px", background: "none", border: "none", color: "#ff4444", cursor: "pointer" }}
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none", color: "var(--error)", cursor: "pointer", borderRadius: "4px" }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = "var(--item-hover)"}
+                          onMouseLeave={(e) => e.currentTarget.style.background = "none"}
                           onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); onDelete(chat.id); }}
                         >
                           Delete

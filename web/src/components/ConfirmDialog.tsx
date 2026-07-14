@@ -8,6 +8,8 @@ interface Props {
   cancelLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
+  hideCancel?: boolean;
+  confirmVariant?: string;
 }
 
 export default function ConfirmDialog({
@@ -18,6 +20,8 @@ export default function ConfirmDialog({
   cancelLabel = "Cancel",
   onCancel,
   onConfirm,
+  hideCancel = false,
+  confirmVariant = "danger",
 }: Props) {
   if (!open) return null;
 
@@ -36,10 +40,12 @@ export default function ConfirmDialog({
           {message}
         </p>
         <div className="btn-row">
-          <button className="cancel" onClick={onCancel} type="button">
-            {cancelLabel}
-          </button>
-          <button className="danger" onClick={onConfirm} type="button">
+          {!hideCancel && (
+            <button className="cancel" onClick={onCancel} type="button">
+              {cancelLabel}
+            </button>
+          )}
+          <button className={confirmVariant} onClick={onConfirm} type="button">
             {confirmLabel}
           </button>
         </div>

@@ -124,8 +124,8 @@ export default function ChatInterface() {
   const [selectMode, setSelectMode] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
 
 
 
@@ -474,8 +474,9 @@ export default function ChatInterface() {
     const res = await fetch("/api/share", { method: "POST", headers: authHeaders(), body: JSON.stringify({ chat_id: id }) });
     if (res.ok) {
       const { share_token } = await res.json();
-      navigator.clipboard.writeText(`${window.location.origin}/share/${share_token}`);
-      alert("Share link copied to clipboard!");
+      const url = `${window.location.origin}/share/${share_token}`;
+      navigator.clipboard.writeText(url);
+      setShareUrl(url);
     }
   }
 
@@ -770,6 +771,16 @@ export default function ChatInterface() {
         confirmLabel="Delete"
         onCancel={() => setPendingDelete(null)}
         onConfirm={confirmDeleteChats}
+      />
+      <ConfirmDialog
+        open={shareUrl !== null}
+        title="Link Copied"
+        message="Your conversation snapshot link has been copied to your clipboard!"
+        confirmLabel="OK"
+        hideCancel={true}
+        confirmVariant="primary"
+        onCancel={() => setShareUrl(null)}
+        onConfirm={() => setShareUrl(null)}
       />
 
 
