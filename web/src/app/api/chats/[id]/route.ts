@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }

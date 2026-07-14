@@ -175,11 +175,16 @@ export async function POST(req: NextRequest) {
 
         if (titlePromise) {
           const newTitle = await titlePromise;
-          await supabase
+          const { error: updateError } = await supabase
             .from("chats")
             .update({ title: newTitle, updated_at: new Date().toISOString() })
             .eq("id", chat_id);
-          send({ type: "title", title: newTitle });
+          
+          if (updateError) {
+            console.error("Failed to update chat title:", updateError);
+          } else {
+            send({ type: "title", title: newTitle });
+          }
         }
 
         send({ type: "done", latency_ms: latencyMs });

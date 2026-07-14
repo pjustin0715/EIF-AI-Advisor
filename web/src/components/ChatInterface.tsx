@@ -191,7 +191,7 @@ export default function ChatInterface() {
   const loadChats = useCallback(async () => {
     setChatsLoading(true);
 
-    const res = await fetch("/api/chats", { headers: authHeaders() });
+    const res = await fetch("/api/chats", { headers: authHeaders(), cache: "no-store" });
 
     if (res.status === 401) {
 
