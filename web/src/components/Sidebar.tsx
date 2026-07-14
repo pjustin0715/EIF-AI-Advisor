@@ -122,7 +122,7 @@ export default function Sidebar({
                 {!selectMode && (
                   <div className="chat-options-container" style={{ position: "relative" }}>
                     <button
-                      className="options-btn"
+                      className="delete-btn"
                       onClick={(e) => {
                         e.stopPropagation();
                         setOpenDropdownId(openDropdownId === chat.id ? null : chat.id);
