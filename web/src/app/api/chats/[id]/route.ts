@@ -85,10 +85,13 @@ export async function PATCH(
     return NextResponse.json({ error: "Chat not found" }, { status: 404 });
   }
 
-  await supabase
+  const { data: updatedChat, error: updateError } = await supabase
     .from("chats")
     .update({ title, updated_at: new Date().toISOString() })
-    .eq("id", params.id);
+    .eq("id", params.id)
+    .select();
+    
+  console.log("PATCH update result:", { paramsId: params.id, title, updatedChat, updateError });
 
   return NextResponse.json({ status: "success" });
 }

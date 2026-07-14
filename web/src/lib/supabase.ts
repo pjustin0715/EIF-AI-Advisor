@@ -6,7 +6,16 @@ export function getSupabaseAdmin() {
   if (!url || !key) {
     throw new Error("Supabase is not configured");
   }
-  return createClient(url, key);
+  return createClient(url, key, {
+    auth: {
+      persistSession: false,
+    },
+    global: {
+      fetch: (fetchUrl, options) => {
+        return fetch(fetchUrl, { ...options, cache: "no-store" });
+      },
+    },
+  });
 }
 
 export const ADVISORS: Record<string, { name: string }> = {
