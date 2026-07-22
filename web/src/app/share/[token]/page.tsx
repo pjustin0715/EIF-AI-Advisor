@@ -1,26 +1,77 @@
-import { getSupabaseAdmin } from "@/lib/supabase";
+"use client";
+
+import { useEffect, useState } from "react";
 import { marked } from "marked";
-import { notFound } from "next/navigation";
+import LoginOverlay from "@/components/LoginOverlay";
+import { getAccessToken, authHeaders } from "@/lib/auth-client";
 
-export default async function SharedChatPage({ params }: { params: { token: string } }) {
-  const supabase = getSupabaseAdmin();
-  
-  const { data: chat } = await supabase
-    .from("chats")
-    .select("*")
-    .eq("share_token", params.token)
-    .single();
+export default function SharedChatPage({ params }: { params: { token: string } }) {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [chat, setChat] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  if (!chat || !chat.shared_at) {
-    notFound();
+  useEffect(() => {
+    const token = getAccessToken();
+    if (token) {
+      setIsAuthenticated(true);
+      fetchChat();
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchChat = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/share/${params.token}`, {
+        headers: authHeaders(),
+      });
+      if (!res.ok) {
+        if (res.status === 404) setError("Shared chat not found.");
+        else if (res.status === 401) setError("Unauthorized access.");
+        else setError("Failed to load shared chat.");
+        return;
+      }
+      const data = await res.json();
+      setChat(data.chat);
+      setMessages(data.messages);
+    } catch (err) {
+      setError("An error occurred while fetching the shared chat.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+    fetchChat();
+  };
+
+  if (!isAuthenticated) {
+    return <LoginOverlay onLogin={handleLogin} />;
   }
 
-  const { data: messages } = await supabase
-    .from("messages")
-    .select("*")
-    .eq("chat_id", chat.id)
-    .lte("created_at", chat.shared_at)
-    .order("created_at", { ascending: true });
+  if (loading) {
+    return (
+      <div className="app-container">
+        <div className="main-chat" style={{ justifyContent: "center", alignItems: "center" }}>
+          Loading shared chat...
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !chat) {
+    return (
+      <div className="app-container">
+        <div className="main-chat" style={{ justifyContent: "center", alignItems: "center", color: "var(--error)" }}>
+          {error || "Shared chat not found."}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
@@ -28,7 +79,7 @@ export default async function SharedChatPage({ params }: { params: { token: stri
         <div className="header">
           <div className="header-title" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <h1>{chat.title}</h1>
-            <span style={{ fontSize: "0.85rem", color: "#888", backgroundColor: "#333", padding: "2px 8px", borderRadius: "12px" }}>Shared Snapshot</span>
+            <span style={{ fontSize: "0.85rem", color: "#888", backgroundColor: "#333", padding: "4px 8px", borderRadius: "12px" }}>Shared Snapshot</span>
           </div>
         </div>
         <div className="chat-messages">
