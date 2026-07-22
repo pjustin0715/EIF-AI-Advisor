@@ -94,7 +94,7 @@ body {
 }
 
 .sidebar {
-  width: 260px;
+  width: 300px;
   background: var(--sidebar-bg);
   border-right: 1px solid var(--sidebar-border);
   display: flex;
@@ -199,7 +199,7 @@ body {
 }
 
 .chat-item {
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-radius: 6px;
   cursor: pointer;
   display: flex;
@@ -230,7 +230,7 @@ body {
 }
 
 .chat-title {
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -302,6 +302,7 @@ body {
   gap: 16px;
   align-items: flex-start;
   line-height: 1.6;
+  font-size: 1.05rem;
 }
 
 .message--user {
@@ -432,7 +433,7 @@ body {
   flex-grow: 1;
   border: none;
   outline: none;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
 }
 
 .input-area button {
@@ -701,7 +702,8 @@ body {
 .modal-box input,
 .modal-box select {
   width: 100%;
-  padding: 12px;
+  padding: 14px;
+  font-size: 1rem;
   margin-bottom: 16px;
   border: 1px solid var(--sidebar-border);
   border-radius: 8px;
