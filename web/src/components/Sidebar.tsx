@@ -39,6 +39,7 @@ export default function Sidebar({
 }: Props) {
   const selectedCount = selectedIds.size;
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
 
 
   return (
@@ -126,7 +127,13 @@ export default function Sidebar({
                       style={{ fontSize: "16px", fontWeight: "bold", padding: "0 4px" }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setOpenDropdownId(openDropdownId === chat.id ? null : chat.id);
+                        if (openDropdownId === chat.id) {
+                          setOpenDropdownId(null);
+                        } else {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setDropdownPos({ top: rect.bottom + 4, left: rect.left });
+                          setOpenDropdownId(chat.id);
+                        }
                       }}
                       type="button"
                       aria-label="Chat options"
@@ -135,12 +142,14 @@ export default function Sidebar({
                     </button>
                     {openDropdownId === chat.id && (
                       <div className="dropdown-menu" style={{ 
-                        position: "absolute", left: 0, top: "100%", 
+                        position: "fixed", 
+                        left: dropdownPos.left, 
+                        top: dropdownPos.top, 
                         background: "var(--bg-color)", 
                         border: "1px solid var(--sidebar-border)", 
                         boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                         borderRadius: "8px", 
-                        zIndex: 10, 
+                        zIndex: 9999, 
                         padding: "6px",
                         minWidth: "150px",
                         fontSize: "14px"
