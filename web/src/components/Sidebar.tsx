@@ -135,7 +135,7 @@ export default function Sidebar({
                     </button>
                     {openDropdownId === chat.id && (
                       <div className="dropdown-menu" style={{ 
-                        position: "absolute", right: 0, top: "100%", 
+                        position: "absolute", left: 0, top: "100%", 
                         background: "var(--bg-color)", 
                         border: "1px solid var(--sidebar-border)", 
                         boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
