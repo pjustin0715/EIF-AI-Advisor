@@ -6,6 +6,7 @@ import {
   type ContextUsage,
   usableContextTokens as usableShared,
 } from "@/lib/context-window-shared";
+import { stripNextQuestion } from "@/lib/next-question";
 
 export type { ContextUsage };
 export { buildContextUsage };
@@ -84,7 +85,7 @@ export function toOpenAIMessages(
   for (const m of history) {
     out.push({
       role: m.role === "user" ? "user" : "assistant",
-      content: m.content,
+      content: m.role === "user" ? m.content : stripNextQuestion(m.content),
     });
   }
   return out;
@@ -105,7 +106,9 @@ export async function summarizeForCompact(
   const transcript = messagesToCompact
     .map((m) => {
       const role = m.role === "user" ? "User" : "Assistant";
-      return `${role}: ${m.content}`;
+      const content =
+        m.role === "user" ? m.content : stripNextQuestion(m.content);
+      return `${role}: ${content}`;
     })
     .join("\n\n")
     .slice(0, 120_000);

@@ -15,6 +15,7 @@ import {
 } from "@/lib/llm";
 import { isDefaultChatTitle } from "@/lib/drafts";
 import { generateChatTitle } from "@/lib/generate-title";
+import { extractNextQuestion } from "@/lib/next-question";
 import { buildSystemPrompt, retrieveContext } from "@/lib/rag-client";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -190,10 +191,13 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        const { body: persistedContent, question: nextQuestion } =
+          extractNextQuestion(fullText);
+
         await supabase.from("messages").insert({
           chat_id,
           role: "model",
-          content: fullText,
+          content: persistedContent,
           citations: citations.length ? citations : null,
         });
 
@@ -206,7 +210,10 @@ export async function POST(req: NextRequest) {
 
         const postUsage = contextUsageFromPrompt({
           systemPrompt,
-          history: [...promptHistory, { role: "model", content: fullText }],
+          history: [
+            ...promptHistory,
+            { role: "model", content: persistedContent },
+          ],
           summary: contextSummary,
           compacted: didCompact,
         });
@@ -237,6 +244,10 @@ export async function POST(req: NextRequest) {
           } else {
             send({ type: "title", title: newTitle });
           }
+        }
+
+        if (nextQuestion) {
+          send({ type: "suggestion", question: nextQuestion });
         }
 
         send({ type: "done", latency_ms: latencyMs });

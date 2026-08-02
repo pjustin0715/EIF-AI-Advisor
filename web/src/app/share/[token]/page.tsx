@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { marked } from "marked";
 import LoginOverlay from "@/components/LoginOverlay";
 import { getAccessToken, authHeaders } from "@/lib/auth-client";
+import { extractNextQuestion } from "@/lib/next-question";
 
 export default function SharedChatPage({ params }: { params: { token: string } }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -93,7 +94,13 @@ export default function SharedChatPage({ params }: { params: { token: string } }
                     {msg.role === "user" ? "U" : "AI"}
                   </div>
                   <div className="message-content">
-                    <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.content || "") }} />
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: marked.parse(
+                          extractNextQuestion(msg.content || "").body
+                        ),
+                      }}
+                    />
                   </div>
                 </div>
               ))

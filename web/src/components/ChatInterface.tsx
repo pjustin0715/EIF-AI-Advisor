@@ -24,6 +24,7 @@ import {
   usableContextTokens,
   type ContextUsage,
 } from "@/lib/context-window-shared";
+import { extractNextQuestion } from "@/lib/next-question";
 import EmptyChatState from "./EmptyChatState";
 import ConfirmDialog from "./ConfirmDialog";
 import ContextMeter from "./ContextMeter";
@@ -35,6 +36,7 @@ interface Message {
   role: "user" | "model" | "assistant";
   content: string;
   citations?: string[] | null;
+  suggestion?: string | null;
 }
 interface Chat {
   id: string;
@@ -340,6 +342,7 @@ export default function ChatInterface() {
     abortRef.current = abort;
     let assistantText = "";
     let assistantCitations: string[] = [];
+    let assistantSuggestion: string | null = null;
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -382,6 +385,8 @@ export default function ChatInterface() {
           } else if (payload.type === "token") {
             assistantText += payload.text;
             setStreamingText(assistantText);
+          } else if (payload.type === "suggestion" && payload.question) {
+            assistantSuggestion = String(payload.question);
           } else if (payload.type === "title" && payload.title) {
             updateChatTitle(chatId, payload.title);
           } else if (payload.type === "error") {
@@ -391,12 +396,16 @@ export default function ChatInterface() {
       }
       setStreamingText("");
       if (assistantText.trim()) {
+        const extracted = extractNextQuestion(assistantText);
+        const suggestion =
+          assistantSuggestion || extracted.question || null;
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: assistantText,
+            content: extracted.body,
             citations: assistantCitations.length ? assistantCitations : null,
+            suggestion,
           },
         ]);
       }
@@ -548,31 +557,52 @@ export default function ChatInterface() {
                         </div>
                       </div>
                     </div>
-                    {messages.map((msg, idx) => (
-                    <div
-                      key={idx}
-                      className={`message ${msg.role === "user" ? "message--user" : "message--ai"}`}
-                    >
-                      <div className={`avatar ${msg.role === "user" ? "user" : "ai"}`}>
-                        {msg.role === "user" ? (
-                          profilePicture ? (
-                            <img src={profilePicture} alt="User" className="avatar-img" />
-                          ) : (
-                            "U"
-                          )
-                        ) : (
-                          "AI"
-                        )}
-                      </div>
-                      <div className="message-content">
+                    {messages.map((msg, idx) => {
+                      const isLatestAi =
+                        idx === messages.length - 1 &&
+                        msg.role !== "user" &&
+                        !!msg.suggestion &&
+                        !loading;
+                      return (
                         <div
-                          dangerouslySetInnerHTML={{
-                            __html: marked.parse(msg.content || ""),
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                          key={idx}
+                          className={`message ${msg.role === "user" ? "message--user" : "message--ai"}`}
+                        >
+                          <div className={`avatar ${msg.role === "user" ? "user" : "ai"}`}>
+                            {msg.role === "user" ? (
+                              profilePicture ? (
+                                <img src={profilePicture} alt="User" className="avatar-img" />
+                              ) : (
+                                "U"
+                              )
+                            ) : (
+                              "AI"
+                            )}
+                          </div>
+                          <div className="message-content">
+                            <div
+                              dangerouslySetInnerHTML={{
+                                __html: marked.parse(
+                                  extractNextQuestion(msg.content || "").body
+                                ),
+                              }}
+                            />
+                            {isLatestAi && msg.suggestion && (
+                              <SuggestionChips
+                                suggestions={[
+                                  {
+                                    label: msg.suggestion,
+                                    query: msg.suggestion,
+                                  },
+                                ]}
+                                onSelect={(query) => sendMessage(query)}
+                                disabled={loading}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </>
                 )}
                 {loading && (streamingText || streamingCitations.length > 0) && (
@@ -582,7 +612,9 @@ export default function ChatInterface() {
                       {streamingText ? (
                           <div
                             dangerouslySetInnerHTML={{
-                              __html: marked.parse(streamingText),
+                              __html: marked.parse(
+                                extractNextQuestion(streamingText).body
+                              ),
                             }}
                           />
                       ) : (

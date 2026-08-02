@@ -720,6 +720,11 @@ body {
   margin-top: 8px;
 }
 
+.message-content .suggestion-chips {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+
 .suggestion-chip {
   background: var(--sidebar-bg);
   border: 1px solid var(--sidebar-border);
