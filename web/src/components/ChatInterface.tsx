@@ -98,7 +98,6 @@ export default function ChatInterface() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [advisorName, setAdvisorName] = useState("AI Advisor");
   const [activeAdvisorId, setActiveAdvisorId] = useState("advisor1");
   const [emptyAdvisorId, setEmptyAdvisorId] = useState("advisor1");
   const [advisorMap, setAdvisorMap] = useState<Record<string, { name: string, purpose?: string }>>({});
@@ -225,7 +224,6 @@ export default function ChatInterface() {
     const advId = data.chat?.advisor_id;
     if (advId) {
       setActiveAdvisorId(advId);
-      setAdvisorName(advisorMap[advId]?.name || "AI Advisor");
     }
     setMessagesLoading(false);
   }, []);
@@ -247,11 +245,6 @@ export default function ChatInterface() {
     }
     setChatsLoading(false);
   }, []);
-  useEffect(() => {
-    if (activeAdvisorId && advisorMap[activeAdvisorId]) {
-      setAdvisorName(advisorMap[activeAdvisorId].name);
-    }
-  }, [activeAdvisorId, advisorMap]);
   useEffect(() => {
     const token = getAccessToken();
     if (token) {
@@ -500,7 +493,6 @@ export default function ChatInterface() {
     setActiveChatId(chat.id);
     activeChatIdRef.current = chat.id;
     setActiveAdvisorId(advisorId);
-    setAdvisorName(advisorMap[advisorId]?.name || "AI Advisor");
     clearPendingDraft();
     await loadChats();
     return chat.id;
@@ -692,7 +684,6 @@ export default function ChatInterface() {
           setContextUsage(null);
           setContextSummary(null);
           setActiveAdvisorId(advisorId);
-          setAdvisorName(advisorMap[advisorId]?.name || "AI Advisor");
           setActiveChatId(id);
         }}
       />
@@ -821,7 +812,7 @@ export default function ChatInterface() {
                 <PanelLeft className="h-4 w-4" />
               </button>
             )}
-            <h1>{showEmptyState ? "EIF AI Advisor" : advisorName}</h1>
+            {showEmptyState && <h1>EIF AI Advisor</h1>}
           </div>
           {isAuthenticated && (
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>

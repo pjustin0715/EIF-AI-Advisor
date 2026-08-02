@@ -1,5 +1,5 @@
 "use client";
-import { MessageCircle, MoreHorizontal, PanelLeft, Plus, SlidersHorizontal } from "lucide-react";
+import { MessageCircle, MoreHorizontal, PanelLeft, Plus, SlidersHorizontal, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,9 +70,9 @@ export default function Sidebar({
         </button>
       </div>
 
-      <div className="sidebar-section-header">
-        <h2>Chats</h2>
-        <div className="sidebar-actions">
+      <div className={`sidebar-section-header ${selectMode ? "selecting" : ""}`}>
+        <div className="sidebar-section-title">
+          <h2>Chats</h2>
           {!selectMode && (
             <button
               className="sidebar-icon-btn"
@@ -85,26 +85,29 @@ export default function Sidebar({
             </button>
           )}
         </div>
+        {selectMode && (
+          <div className="select-toolbar">
+            <span className="select-count">{selectedCount} selected</span>
+            <button className="select-pill" onClick={onSelectAll} type="button">
+              Select all
+            </button>
+            {selectedCount > 0 && (
+              <button className="select-pill danger" onClick={onBulkDelete} type="button">
+                Delete
+              </button>
+            )}
+            <button
+              className="select-pill icon"
+              onClick={onToggleSelectMode}
+              title="Exit selection"
+              type="button"
+              aria-label="Exit selection"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
-
-      {selectMode && (
-        <div className="select-toolbar">
-          <button className="toolbar-btn" onClick={onSelectAll} type="button">
-            {selectedCount === chats.length ? "Deselect all" : "Select all"}
-          </button>
-          <button
-            className="toolbar-btn danger"
-            disabled={selectedCount === 0}
-            onClick={onBulkDelete}
-            type="button"
-          >
-            Delete{selectedCount > 0 ? ` (${selectedCount})` : ""}
-          </button>
-          <button className="toolbar-btn" onClick={onToggleSelectMode} type="button">
-            Cancel
-          </button>
-        </div>
-      )}
 
       <div className="chat-list">
         {chats.length === 0 ? (
@@ -131,7 +134,7 @@ export default function Sidebar({
                 role="button"
                 tabIndex={0}
               >
-                {selectMode ? (
+                {selectMode && (
                   <input
                     type="checkbox"
                     className="chat-checkbox"
@@ -140,9 +143,8 @@ export default function Sidebar({
                     onClick={(e) => e.stopPropagation()}
                     aria-label={`Select ${chat.title}`}
                   />
-                ) : (
-                  <MessageCircle className="chat-item-icon" />
                 )}
+                <MessageCircle className="chat-item-icon" />
                 <span className="chat-title">{chat.title}</span>
                 {!selectMode && (
                   <div
