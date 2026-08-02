@@ -91,6 +91,8 @@ export default function ChatInterface() {
     number | null
   >(null);
   const [pendingQuery, setPendingQuery] = useState<string | null>(null);
+  const [queues, setQueues] = useState<Record<string, QueuedPrompt[]>>({});
+  const [editingQueueId, setEditingQueueId] = useState<string | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
@@ -104,7 +106,84 @@ export default function ChatInterface() {
   const prevChatIdRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const skipLoadRef = useRef(false);
+  const loadingRef = useRef(false);
+  const queuesRef = useRef<Record<string, QueuedPrompt[]>>({});
+  const streamingChatIdRef = useRef<string | null>(null);
   const showEmptyState = isAuthenticated && !chatsLoading && chats.length === 0;
+
+  function setLoadingFlag(value: boolean) {
+    loadingRef.current = value;
+    setLoading(value);
+  }
+
+  function syncQueues(
+    updater: (prev: Record<string, QueuedPrompt[]>) => Record<string, QueuedPrompt[]>
+  ) {
+    setQueues((prev) => {
+      const next = updater(prev);
+      queuesRef.current = next;
+      return next;
+    });
+  }
+
+  function enqueuePrompt(chatId: string, text: string) {
+    const item: QueuedPrompt = {
+      id:
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      text,
+    };
+    syncQueues((prev) => ({
+      ...prev,
+      [chatId]: [...(prev[chatId] || []), item],
+    }));
+  }
+
+  function clearChatQueue(chatId: string) {
+    syncQueues((prev) => ({ ...prev, [chatId]: [] }));
+    setEditingQueueId(null);
+  }
+
+  function dequeuePrompt(chatId: string): string | null {
+    const list = queuesRef.current[chatId] || [];
+    if (list.length === 0) return null;
+    const [head, ...rest] = list;
+    const next = { ...queuesRef.current, [chatId]: rest };
+    queuesRef.current = next;
+    setQueues(next);
+    return head.text;
+  }
+
+  function removeQueueItem(chatId: string, id: string) {
+    syncQueues((prev) => ({
+      ...prev,
+      [chatId]: (prev[chatId] || []).filter((item) => item.id !== id),
+    }));
+    setEditingQueueId((current) => (current === id ? null : current));
+  }
+
+  function updateQueueItem(chatId: string, id: string, text: string) {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      removeQueueItem(chatId, id);
+      return;
+    }
+    syncQueues((prev) => ({
+      ...prev,
+      [chatId]: (prev[chatId] || []).map((item) =>
+        item.id === id ? { ...item, text: trimmed } : item
+      ),
+    }));
+  }
+
+  function discardPartialStream() {
+    setStreamingText("");
+    setStreamingRetrieval(null);
+    setRetrievalStatus(null);
+    setRetrievalRankingCount(null);
+    setPendingQuery(null);
+  }
   const scrollToBottom = useCallback(() => {
     if (chatboxRef.current) {
       chatboxRef.current.scrollTop = chatboxRef.current.scrollHeight;
@@ -195,7 +274,7 @@ export default function ChatInterface() {
   }, [activeChatId, isAuthenticated, loadMessages]);
   useEffect(() => {
     scrollToBottom();
-  }, [messages, scrollToBottom]);
+  }, [messages, streamingText, scrollToBottom]);
   function handleInputChange(value: string) {
     setInput(value);
     if (activeChatId) {
@@ -205,6 +284,7 @@ export default function ChatInterface() {
     }
   }
   function handleLogout() {
+    abortRef.current?.abort();
     setIsAuthenticated(false);
     setIsAdmin(false);
     setActiveChatId(null);
@@ -214,6 +294,11 @@ export default function ChatInterface() {
     setContextSummary(null);
     setSelectMode(false);
     setSelectedIds(new Set());
+    setQueues({});
+    queuesRef.current = {};
+    setEditingQueueId(null);
+    setLoadingFlag(false);
+    discardPartialStream();
   }
 
   async function handleManualCompact() {
@@ -285,7 +370,15 @@ export default function ChatInterface() {
       });
     }
     clearDrafts(ids);
+    syncQueues((prev) => {
+      const next = { ...prev };
+      for (const id of ids) delete next[id];
+      return next;
+    });
     if (activeChatId && ids.includes(activeChatId)) {
+      if (streamingChatIdRef.current === activeChatId) {
+        abortRef.current?.abort();
+      }
       setActiveChatId(null);
       setMessages([]);
       setContextUsage(null);
@@ -329,8 +422,23 @@ export default function ChatInterface() {
     if (res.ok) updateChatTitle(id, newTitle);
   }
   function stopStreaming() {
+    discardPartialStream();
     abortRef.current?.abort();
   }
+
+  function steerMessage() {
+    const text = input.trim();
+    if (!text || !loadingRef.current) return;
+    const chatId = streamingChatIdRef.current || activeChatId;
+    if (!chatId) return;
+    clearChatQueue(chatId);
+    enqueuePrompt(chatId, text);
+    setInput("");
+    clearDraft(chatId);
+    discardPartialStream();
+    abortRef.current?.abort();
+  }
+
   async function createChat(advisorId: string): Promise<string | null> {
     const res = await fetch("/api/chats", {
       method: "POST",
@@ -351,17 +459,27 @@ export default function ChatInterface() {
     await loadChats();
     return chat.id;
   }
-  async function sendMessage(overrideText?: string) {
-    const text = (overrideText ?? input).trim();
-    if (!text || loading) return;
-    let chatId = activeChatId;
-    if (!chatId) {
-      chatId = await createChat(emptyAdvisorId);
-      if (!chatId) return;
+
+  async function drainQueue(chatId: string) {
+    if (loadingRef.current) return;
+    if (activeChatIdRef.current !== chatId) return;
+    const next = dequeuePrompt(chatId);
+    if (!next) return;
+    await startTurn(chatId, next, { clearInput: false });
+  }
+
+  async function startTurn(
+    chatId: string,
+    text: string,
+    options?: { clearInput?: boolean }
+  ) {
+    if (loadingRef.current) return;
+    if (options?.clearInput !== false) {
+      setInput("");
+      clearDraft(chatId);
     }
-    setInput("");
-    clearDraft(chatId);
-    setLoading(true);
+    setLoadingFlag(true);
+    streamingChatIdRef.current = chatId;
     setStreamingRetrieval(null);
     setRetrievalStatus(null);
     setRetrievalRankingCount(null);
@@ -449,24 +567,64 @@ export default function ChatInterface() {
         ]);
       }
     } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-      } else {
+      if (!isAbortError(err)) {
         const msg = err instanceof Error ? err.message : "Request failed";
-        setMessages((prev) => [...prev, { role: "model", content: `Error: ${msg}` }]);
+        setMessages((prev) => [
+          ...prev,
+          { role: "model", content: `Error: ${msg}` },
+        ]);
       }
       setStreamingText("");
     } finally {
-      setLoading(false);
+      setLoadingFlag(false);
       setStreamingRetrieval(null);
       setRetrievalStatus(null);
       setRetrievalRankingCount(null);
       setPendingQuery(null);
+      streamingChatIdRef.current = null;
       abortRef.current = null;
       inputRef.current?.focus();
+      await drainQueue(chatId);
     }
   }
+
+  async function sendMessage(overrideText?: string) {
+    const fromInput = overrideText === undefined;
+    const text = (overrideText ?? input).trim();
+    if (!text) return;
+
+    if (loadingRef.current) {
+      const chatId =
+        activeChatId || streamingChatIdRef.current;
+      if (!chatId) return;
+      enqueuePrompt(chatId, text);
+      if (fromInput) {
+        setInput("");
+        clearDraft(chatId);
+      }
+      return;
+    }
+
+    let chatId = activeChatId;
+    if (!chatId) {
+      chatId = await createChat(emptyAdvisorId);
+      if (!chatId) return;
+    }
+    await startTurn(chatId, text, { clearInput: fromInput });
+  }
+
+  useEffect(() => {
+    if (!activeChatId || loadingRef.current) return;
+    const queued = queuesRef.current[activeChatId];
+    if (queued?.length) {
+      void drainQueue(activeChatId);
+    }
+    // Drain stranded queues when returning to a chat while idle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChatId]);
   const profilePicture = getProfilePicture();
   const threadSuggestions = getSuggestions(activeAdvisorId);
+  const activeQueue = activeChatId ? queues[activeChatId] || [] : [];
   return (
     <div className="app-container">
       {!isAuthenticated && (
@@ -704,15 +862,90 @@ export default function ChatInterface() {
               </div>
             </div>
             <div className="input-container">
+              {activeChatId && activeQueue.length > 0 && (
+                <div className="prompt-queue" aria-label="Queued prompts">
+                  <div className="prompt-queue-header">
+                    <span>
+                      {activeQueue.length} queued
+                    </span>
+                    <button
+                      type="button"
+                      className="prompt-queue-clear"
+                      onClick={() => clearChatQueue(activeChatId)}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <ul className="prompt-queue-list">
+                    {activeQueue.map((item, index) => (
+                      <li key={item.id} className="prompt-queue-item">
+                        <span className="prompt-queue-index">{index + 1}</span>
+                        {editingQueueId === item.id ? (
+                          <input
+                            className="prompt-queue-edit"
+                            autoFocus
+                            defaultValue={item.text}
+                            onBlur={(e) => {
+                              updateQueueItem(
+                                activeChatId,
+                                item.id,
+                                e.target.value
+                              );
+                              setEditingQueueId(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                updateQueueItem(
+                                  activeChatId,
+                                  item.id,
+                                  (e.target as HTMLInputElement).value
+                                );
+                                setEditingQueueId(null);
+                              } else if (e.key === "Escape") {
+                                setEditingQueueId(null);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            className="prompt-queue-text"
+                            onClick={() => setEditingQueueId(item.id)}
+                            title="Edit queued prompt"
+                          >
+                            {item.text}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="prompt-queue-remove"
+                          onClick={() => removeQueueItem(activeChatId, item.id)}
+                          aria-label="Remove from queue"
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="input-area">
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder="Message..."
+                  placeholder={
+                    loading ? "Queue a follow-up or steer..." : "Message..."
+                  }
                   value={input}
-                  disabled={!isAuthenticated || !activeChatId || loading}
+                  disabled={!isAuthenticated || !activeChatId}
                   onChange={(e) => handleInputChange(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
                 />
                 {activeChatId && (
                   <ContextMeter
@@ -736,18 +969,43 @@ export default function ChatInterface() {
                       );
                     })()}
                     compacting={compacting}
-                    canCompact={
-                      !loading && !compacting && messages.length > 10
-                    }
+                    canCompact={!loading && !compacting && messages.length >= 2}
                     onCompact={handleManualCompact}
                   />
                 )}
                 {loading ? (
-                  <button onClick={stopStreaming} type="button" className="send-btn stop-btn">
-                    <svg viewBox="0 0 24 24">
-                      <rect x="6" y="6" width="12" height="12" />
-                    </svg>
-                  </button>
+                  <>
+                    <button
+                      onClick={steerMessage}
+                      type="button"
+                      className="send-btn steer-btn"
+                      disabled={!input.trim()}
+                      title="Steer: abort and redirect"
+                    >
+                      Steer
+                    </button>
+                    <button
+                      onClick={() => sendMessage()}
+                      type="button"
+                      className="send-btn"
+                      disabled={!input.trim()}
+                      title="Add to queue"
+                    >
+                      <svg viewBox="0 0 24 24">
+                        <path d="M3 20V4L22 12L3 20ZM5 17L16.85 12L5 7V10.5L11 12L5 13.5V17Z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={stopStreaming}
+                      type="button"
+                      className="send-btn stop-btn"
+                      title="Stop generation"
+                    >
+                      <svg viewBox="0 0 24 24">
+                        <rect x="6" y="6" width="12" height="12" />
+                      </svg>
+                    </button>
+                  </>
                 ) : (
                   <button
                     className="send-btn"

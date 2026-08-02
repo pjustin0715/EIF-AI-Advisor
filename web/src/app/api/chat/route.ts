@@ -201,16 +201,22 @@ export async function POST(req: NextRequest) {
         await pause(160);
         send({ type: "context", ...contextUsage });
 
-        const response = await openai.chat.completions.create({
-          model: targetModel,
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...openAIHistory,
-          ],
-          stream: true,
-        });
+        const response = await openai.chat.completions.create(
+          {
+            model: targetModel,
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...openAIHistory,
+            ],
+            stream: true,
+          },
+          { signal: req.signal }
+        );
 
         for await (const chunk of response) {
+          if (req.signal.aborted) {
+            break;
+          }
           if (chunk.model) {
             actualModelUsed = chunk.model;
           }
@@ -220,6 +226,22 @@ export async function POST(req: NextRequest) {
             completionTokens += estimateTokens(text);
             send({ type: "token", text });
           }
+        }
+
+        if (req.signal.aborted) {
+          await supabase.from("turn_logs").insert({
+            conversation_id: chat_id,
+            user_email: userEmail,
+            advisor_id: chat.advisor_id,
+            model: actualModelUsed,
+            prompt_tokens: promptTokenEstimate,
+            completion_tokens: completionTokens,
+            latency_ms: Date.now() - startTime,
+            retrieved_chunk_ids: retrievedChunkIds,
+            status: "cancelled",
+            block_reason: "client_aborted",
+          });
+          return;
         }
 
         const { body: persistedContent, question: nextQuestion } =
@@ -286,18 +308,39 @@ export async function POST(req: NextRequest) {
 
         send({ type: "done", latency_ms: latencyMs });
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Generation failed";
-        send({ type: "error", message });
-        await supabase.from("turn_logs").insert({
-          conversation_id: chat_id,
-          user_email: userEmail,
-          advisor_id: chat.advisor_id,
-          model: MODEL,
-          status: "error",
-          block_reason: message,
-          latency_ms: Date.now() - startTime,
-          retrieved_chunk_ids: retrievedChunkIds,
-        });
+        const aborted =
+          req.signal.aborted ||
+          (err instanceof Error &&
+            (err.name === "AbortError" ||
+              err.name === "APIUserAbortError" ||
+              /aborted|abort/i.test(err.message)));
+
+        if (aborted) {
+          await supabase.from("turn_logs").insert({
+            conversation_id: chat_id,
+            user_email: userEmail,
+            advisor_id: chat.advisor_id,
+            model: MODEL,
+            status: "cancelled",
+            block_reason: "client_aborted",
+            latency_ms: Date.now() - startTime,
+            retrieved_chunk_ids: retrievedChunkIds,
+          });
+        } else {
+          const message =
+            err instanceof Error ? err.message : "Generation failed";
+          send({ type: "error", message });
+          await supabase.from("turn_logs").insert({
+            conversation_id: chat_id,
+            user_email: userEmail,
+            advisor_id: chat.advisor_id,
+            model: MODEL,
+            status: "error",
+            block_reason: message,
+            latency_ms: Date.now() - startTime,
+            retrieved_chunk_ids: retrievedChunkIds,
+          });
+        }
       } finally {
         controller.close();
       }

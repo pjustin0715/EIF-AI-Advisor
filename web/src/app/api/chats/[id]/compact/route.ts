@@ -67,7 +67,7 @@ export async function POST(
     return NextResponse.json({
       compacted: false,
       reason:
-        "Not enough older messages to compact. Keep chatting, then try again.",
+        "Nothing left to compact — need at least one older message beyond the latest turn.",
       context_summary: stored.summary,
       compacted_through_at: stored.compactedThroughAt,
       context_usage: buildContextUsage(

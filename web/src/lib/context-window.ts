@@ -201,9 +201,10 @@ export type CompactResult = {
 };
 
 /**
- * Summarize older turns and keep the most recent KEEP_RECENT_MESSAGES verbatim.
- * Auto mode runs only when usage crosses COMPACT_THRESHOLD.
- * Pass force: true for manual compact (ignores threshold).
+ * Summarize older turns and keep recent messages verbatim.
+ * Auto mode runs only when usage crosses COMPACT_THRESHOLD and keeps
+ * KEEP_RECENT_MESSAGES. Manual (force) keeps the latest turn only so
+ * compact is available anytime there is at least one older message.
  */
 export async function maybeCompactHistory(opts: {
   systemPrompt: string;
@@ -223,11 +224,14 @@ export async function maybeCompactHistory(opts: {
     opts.existingSummary
   );
 
+  // Manual compact: keep 1 latest turn. Auto: keep KEEP_RECENT_MESSAGES.
+  const keepRecent = opts.force ? 1 : KEEP_RECENT_MESSAGES;
+
   const shouldCompact =
     opts.force ||
-    (needsCompaction(used) && activeHistory.length > KEEP_RECENT_MESSAGES);
+    (needsCompaction(used) && activeHistory.length > keepRecent);
 
-  if (!shouldCompact || activeHistory.length <= KEEP_RECENT_MESSAGES) {
+  if (!shouldCompact || activeHistory.length <= keepRecent) {
     return {
       summary: opts.existingSummary || "",
       compactedThroughAt: opts.compactedThroughAt || "",
@@ -236,7 +240,7 @@ export async function maybeCompactHistory(opts: {
     };
   }
 
-  const splitAt = Math.max(0, activeHistory.length - KEEP_RECENT_MESSAGES);
+  const splitAt = Math.max(0, activeHistory.length - keepRecent);
   const toCompact = activeHistory.slice(0, splitAt);
   const keptHistory = activeHistory.slice(splitAt);
 
