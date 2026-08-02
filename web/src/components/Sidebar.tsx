@@ -1,5 +1,12 @@
 "use client";
-import { useState } from "react";
+import { MessageCircle, MoreHorizontal, PanelLeft, Plus, SlidersHorizontal } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Chat {
   id: string;
@@ -20,6 +27,7 @@ interface Props {
   onBulkDelete: () => void;
   onShare: (id: string) => void;
   onRename: (id: string) => void;
+  onToggleSidebar: () => void;
 }
 
 export default function Sidebar({
@@ -36,30 +44,44 @@ export default function Sidebar({
   onBulkDelete,
   onShare,
   onRename,
+  onToggleSidebar,
 }: Props) {
   const selectedCount = selectedIds.size;
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
-  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
-
 
   return (
     <div className="sidebar">
-      <div className="sidebar-header">
+      <div className="sidebar-top">
+        <span className="sidebar-brand">EIF AI Advisor</span>
+        <button
+          className="sidebar-toggle-btn"
+          onClick={onToggleSidebar}
+          title="Hide sidebar"
+          type="button"
+          aria-label="Hide sidebar"
+        >
+          <PanelLeft className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="sidebar-new">
+        <button className="new-chat-btn" onClick={onNewChat} title="New Chat" type="button">
+          <Plus className="h-4 w-4" />
+          <span>New</span>
+        </button>
+      </div>
+
+      <div className="sidebar-section-header">
         <h2>Chats</h2>
         <div className="sidebar-actions">
           {!selectMode && (
             <button
-              className="select-mode-btn"
+              className="sidebar-icon-btn"
               onClick={onToggleSelectMode}
               title="Select chats"
               type="button"
+              aria-label="Select chats"
             >
-              Select
-            </button>
-          )}
-          {!selectMode && (
-            <button className="new-chat-btn" onClick={onNewChat} title="New Chat" type="button">
-              +
+              <SlidersHorizontal className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
@@ -109,7 +131,7 @@ export default function Sidebar({
                 role="button"
                 tabIndex={0}
               >
-                {selectMode && (
+                {selectMode ? (
                   <input
                     type="checkbox"
                     className="chat-checkbox"
@@ -118,71 +140,42 @@ export default function Sidebar({
                     onClick={(e) => e.stopPropagation()}
                     aria-label={`Select ${chat.title}`}
                   />
+                ) : (
+                  <MessageCircle className="chat-item-icon" />
                 )}
                 <span className="chat-title">{chat.title}</span>
                 {!selectMode && (
-                  <div className="chat-options-container" style={{ position: "relative" }}>
-                    <button
-                      className="delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (openDropdownId === chat.id) {
-                          setOpenDropdownId(null);
-                        } else {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setDropdownPos({ top: rect.bottom + 4, left: rect.left });
-                          setOpenDropdownId(chat.id);
-                        }
-                      }}
-                      type="button"
-                      aria-label="Chat options"
-                    >
-                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                        <circle cx="5" cy="12" r="1.75" fill="currentColor" />
-                        <circle cx="12" cy="12" r="1.75" fill="currentColor" />
-                        <circle cx="19" cy="12" r="1.75" fill="currentColor" />
-                      </svg>
-                    </button>
-                    {openDropdownId === chat.id && (
-                      <div className="dropdown-menu" style={{ 
-                        position: "fixed", 
-                        left: dropdownPos.left, 
-                        top: dropdownPos.top, 
-                        background: "var(--bg-color)", 
-                        border: "1px solid var(--sidebar-border)", 
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                        borderRadius: "8px", 
-                        zIndex: 9999, 
-                        padding: "6px",
-                        minWidth: "150px",
-                        fontSize: "14px"
-                      }}>
+                  <div
+                    className="chat-options-container"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
                         <button
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", color: "var(--text-main)", cursor: "pointer", borderRadius: "4px" }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = "var(--item-hover)"}
-                          onMouseLeave={(e) => e.currentTarget.style.background = "none"}
-                          onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); onShare(chat.id); }}
+                          className="delete-btn"
+                          type="button"
+                          aria-label="Chat options"
                         >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" side="bottom">
+                        <DropdownMenuItem onSelect={() => onShare(chat.id)}>
                           Share
-                        </button>
-                        <button
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", color: "var(--text-main)", cursor: "pointer", borderRadius: "4px" }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = "var(--item-hover)"}
-                          onMouseLeave={(e) => e.currentTarget.style.background = "none"}
-                          onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); onRename(chat.id); }}
-                        >
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => onRename(chat.id)}>
                           Rename
-                        </button>
-                        <button
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", color: "var(--error)", cursor: "pointer", borderRadius: "4px" }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = "var(--item-hover)"}
-                          onMouseLeave={(e) => e.currentTarget.style.background = "none"}
-                          onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); onDelete(chat.id); }}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onSelect={() => onDelete(chat.id)}
                         >
                           Delete
-                        </button>
-                      </div>
-                    )}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 )}
               </div>
