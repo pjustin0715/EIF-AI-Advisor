@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { saveCompactSummary } from "@/lib/compact-store";
+import { resolveCompactState, saveCompactSummary } from "@/lib/compact-store";
 import {
   buildContextUsage,
   estimatePromptTokens,
   forceCompactHistory,
-  readCompactState,
   type HistoryMessage,
   usableContextTokens,
 } from "@/lib/context-window";
@@ -42,7 +41,7 @@ export async function POST(
     .order("created_at", { ascending: true });
 
   const history = (messages || []) as HistoryMessage[];
-  const stored = readCompactState(history);
+  const stored = resolveCompactState(chat, history);
 
   let result;
   try {

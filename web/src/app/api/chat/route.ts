@@ -1,11 +1,10 @@
 import { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { saveCompactSummary } from "@/lib/compact-store";
+import { resolveCompactState, saveCompactSummary } from "@/lib/compact-store";
 import {
   contextUsageFromPrompt,
   filterHistoryForPrompt,
   maybeCompactHistory,
-  readCompactState,
   toOpenAIMessages,
   type HistoryMessage,
 } from "@/lib/context-window";
@@ -14,6 +13,7 @@ import {
   estimateTokens,
   getOpenRouterClient,
   MODEL,
+  resolveModel,
 } from "@/lib/llm";
 import { isDefaultChatTitle } from "@/lib/drafts";
 import { generateChatTitle } from "@/lib/generate-title";
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
   );
   const retrievedChunkIds = ragContext.retrieved_chunk_ids;
 
-  const stored = readCompactState(history);
+  const stored = resolveCompactState(chat, history);
   let contextSummary = stored.summary;
   let compactedThroughAt = stored.compactedThroughAt;
   let didCompact = false;
@@ -147,7 +147,6 @@ export async function POST(req: NextRequest) {
     compacted: didCompact,
   });
 
-  const openai = getOpenRouterClient();
   const promptTokenEstimate = contextUsage.used;
 
   const stream = new ReadableStream({
@@ -162,13 +161,9 @@ export async function POST(req: NextRequest) {
         .eq("is_active", true)
         .maybeSingle();
 
-      const targetModel = advisorModel?.model_name || MODEL;
+      const targetModel = resolveModel(advisorModel?.model_name);
       let actualModelUsed = targetModel;
-
-      let titlePromise: Promise<string> | null = null;
-      if (shouldAutoTitle) {
-        titlePromise = generateChatTitle(prompt, chat.advisor_id as string);
-      }
+      let titleSent = false;
 
       const send = (payload: Record<string, unknown>) => {
         controller.enqueue(
@@ -176,7 +171,30 @@ export async function POST(req: NextRequest) {
         );
       };
 
+      const persistAndSendTitle = async (newTitle: string) => {
+        if (titleSent || !newTitle) return;
+        const { error: updateError } = await supabase
+          .from("chats")
+          .update({ title: newTitle, updated_at: new Date().toISOString() })
+          .eq("id", chat_id);
+        if (updateError) {
+          console.error("Failed to update chat title:", updateError);
+          return;
+        }
+        titleSent = true;
+        send({ type: "title", title: newTitle });
+      };
+
       try {
+        // Generate a real LLM title in parallel with the retrieval trace.
+        const titleWork = shouldAutoTitle
+          ? generateChatTitle(prompt, chat.advisor_id as string)
+              .then((newTitle) => persistAndSendTitle(newTitle))
+              .catch((err) =>
+                console.error("Auto-title generation failed:", err)
+              )
+          : Promise.resolve();
+
         const pause = (ms: number) =>
           new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -201,6 +219,9 @@ export async function POST(req: NextRequest) {
         await pause(160);
         send({ type: "context", ...contextUsage });
 
+        await titleWork;
+
+        const openai = getOpenRouterClient();
         const response = await openai.chat.completions.create(
           {
             model: targetModel,
@@ -287,20 +308,6 @@ export async function POST(req: NextRequest) {
           retrieved_chunk_ids: retrievedChunkIds,
           status: "ok",
         });
-
-        if (titlePromise) {
-          const newTitle = await titlePromise;
-          const { error: updateError } = await supabase
-            .from("chats")
-            .update({ title: newTitle, updated_at: new Date().toISOString() })
-            .eq("id", chat_id);
-
-          if (updateError) {
-            console.error("Failed to update chat title:", updateError);
-          } else {
-            send({ type: "title", title: newTitle });
-          }
-        }
 
         if (nextQuestion) {
           send({ type: "suggestion", question: nextQuestion });

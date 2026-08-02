@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { resolveCompactState } from "@/lib/compact-store";
 import {
   buildContextUsage,
   estimatePromptTokens,
   filterHistoryForPrompt,
-  readCompactState,
   usableContextTokens,
   visibleMessages,
   type HistoryMessage,
@@ -45,7 +45,7 @@ export async function GET(
     .order("created_at", { ascending: true });
 
   const history = (messages || []) as HistoryMessage[];
-  const stored = readCompactState(history);
+  const stored = resolveCompactState(chat, history);
   const promptHistory = filterHistoryForPrompt(
     history,
     stored.compactedThroughAt
