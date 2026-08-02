@@ -163,7 +163,7 @@ function StepContext({
           {query?.trim() ? ":" : "."}
         </p>
         {query?.trim() && (
-          <blockquote className="retrieval-step__query">{query.trim()}</blockquote>
+          <p className="retrieval-step__query">{query.trim()}</p>
         )}
       </div>
     );
