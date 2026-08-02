@@ -139,4 +139,7 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# SpecStory (local chat history)
+.specstory/
+
 # End of https://mrkandreev.name/snippets/gitignore-generator/#Python

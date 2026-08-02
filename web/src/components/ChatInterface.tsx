@@ -16,6 +16,8 @@ import {
 
   getProfilePicture,
 
+  isAdminUser,
+
 } from "@/lib/auth-client";
 
 import {
@@ -85,16 +87,6 @@ export default function ChatInterface() {
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-
-  const checkAdminRole = (token: string | null) => {
-    if (!token) return false;
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.role === "admin";
-    } catch {
-      return false;
-    }
-  };
 
   const [chatsLoading, setChatsLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -231,7 +223,7 @@ export default function ChatInterface() {
     const token = getAccessToken();
     if (token) {
       setIsAuthenticated(true);
-      setIsAdmin(checkAdminRole(token));
+      setIsAdmin(isAdminUser());
       
       fetch("/api/advisors")
         .then(r => r.json())
@@ -323,6 +315,7 @@ export default function ChatInterface() {
   function handleLogout() {
 
     setIsAuthenticated(false);
+    setIsAdmin(false);
 
     setActiveChatId(null);
 
@@ -727,9 +720,8 @@ export default function ChatInterface() {
         <LoginOverlay
 
           onLogin={() => {
-            const token = getAccessToken();
             setIsAuthenticated(true);
-            setIsAdmin(checkAdminRole(token));
+            setIsAdmin(isAdminUser());
             loadChats();
 
           }}

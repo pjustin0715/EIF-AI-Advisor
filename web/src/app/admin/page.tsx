@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getAccessToken } from "@/lib/auth-client";
+import { getAccessToken, isAdminUser } from "@/lib/auth-client";
 
 interface Advisor {
   id: string;
@@ -17,6 +17,7 @@ export default function AdminDashboard() {
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
   const [savingModel, setSavingModel] = useState<string | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
   const [savingAdvisor, setSavingAdvisor] = useState(false);
@@ -50,10 +51,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const token = getAccessToken();
-    if (!token) {
+    if (!token || !isAdminUser()) {
       window.location.href = "/";
       return;
     }
+    setAuthorized(true);
     fetchDashboardData(token);
   }, []);
 
@@ -155,7 +157,7 @@ export default function AdminDashboard() {
     }
   };
 
-  if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading Admin Dashboard...</div>;
+  if (!authorized || loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading Admin Dashboard...</div>;
   if (error) return <div style={{ padding: 40, color: "red", textAlign: "center" }}>{error}</div>;
 
   return (

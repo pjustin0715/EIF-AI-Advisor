@@ -21,6 +21,24 @@ export function getProfilePicture(): string | null {
   return localStorage.getItem(PICTURE_KEY);
 }
 
+export function getTokenPayload(): { sub?: string; role?: string } | null {
+  const token = getAccessToken();
+  if (!token) return null;
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const base64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+export function isAdminUser(): boolean {
+  return getTokenPayload()?.role === "admin";
+}
+
 export function authHeaders(): HeadersInit {
   const token = getAccessToken();
   return token
