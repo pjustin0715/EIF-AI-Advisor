@@ -1,7 +1,14 @@
 import OpenAI from "openai";
 
-// By default, use OpenRouter's auto-router to select the best/cheapest model for the prompt size.
-const MODEL = process.env.OPENROUTER_MODEL || "openrouter/auto";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openrouter/auto";
+
+function usesOpenRouter(): boolean {
+  return Boolean(process.env.OPENROUTER_API_KEY);
+}
+
+// Prefer OpenRouter when configured; otherwise use Gemini.
+const MODEL = usesOpenRouter() ? OPENROUTER_MODEL : GEMINI_MODEL;
 
 // To estimate tokens safely for usage limits (fallback)
 export function estimateTokens(text: string): number {
@@ -18,13 +25,37 @@ export function estimateCost(
   return 0.0;
 }
 
-export function getOpenRouterClient() {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured");
+/** Resolve a DB/admin model name to one the active provider accepts. */
+export function resolveModel(modelName?: string | null): string {
+  const requested = modelName?.trim() || MODEL;
+  if (usesOpenRouter()) return requested;
+  // Stored OpenRouter ids (e.g. openrouter/auto) are invalid for Gemini.
+  if (requested.startsWith("openrouter/") || requested.includes("/")) {
+    return GEMINI_MODEL;
+  }
+  return requested;
+}
 
+export function getOpenRouterClient() {
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  if (openRouterKey) {
+    return new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: openRouterKey,
+    });
+  }
+
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) {
+    throw new Error(
+      "Neither OPENROUTER_API_KEY nor GEMINI_API_KEY is configured"
+    );
+  }
+
+  // Gemini OpenAI-compatible endpoint — keeps chat/completions streaming as-is.
   return new OpenAI({
-    baseURL: "https://openrouter.ai/api/v1",
-    apiKey: apiKey,
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    apiKey: geminiKey,
   });
 }
 

@@ -1,5 +1,5 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { MODEL } from "./gemini";
+import { titleFromPrompt } from "./drafts";
+import { getOpenRouterClient, MODEL, resolveModel } from "./llm";
 
 const ADVISOR_LABELS: Record<string, string> = {
   advisor1: "Data Dashboard Advisor",
@@ -7,41 +7,52 @@ const ADVISOR_LABELS: Record<string, string> = {
   advisor3: "Data Modeling Advisor",
 };
 
+/** Cheap, short-output model when on OpenRouter; otherwise the active default. */
+function titleModel(): string {
+  if (process.env.OPENROUTER_API_KEY) {
+    return (
+      process.env.OPENROUTER_TITLE_MODEL ||
+      "google/gemini-2.5-flash-lite"
+    );
+  }
+  return resolveModel(MODEL);
+}
+
 export async function generateChatTitle(
   firstMessage: string,
   advisorId?: string
 ): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return fallbackTitle(firstMessage);
-
   const advisorLabel = ADVISOR_LABELS[advisorId || ""] || "AI Advisor";
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: MODEL,
-    generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 24,
-    },
-  });
+  const fallback = titleFromPrompt(firstMessage);
 
   try {
-    const result = await model.generateContent(
-      `Write a short chat title (3-6 words) summarizing this EIF mentoring question. ` +
-        `No quotes, no punctuation at the end. Advisor context: ${advisorLabel}.\n\n` +
-        `Question: ${firstMessage.slice(0, 400)}`
-    );
-    const raw = result.response.text().trim();
+    const openai = getOpenRouterClient();
+    const response = await openai.chat.completions.create({
+      model: titleModel(),
+      temperature: 0.2,
+      max_tokens: 24,
+      messages: [
+        {
+          role: "system",
+          content:
+            `Write a short chat title (3-6 words) summarizing this EIF mentoring question. ` +
+            `No quotes, no ending punctuation. Advisor context: ${advisorLabel}.`,
+        },
+        {
+          role: "user",
+          content: firstMessage.slice(0, 400),
+        },
+      ],
+    });
+
+    const raw = response.choices[0]?.message?.content?.trim() || "";
     const cleaned = raw
       .replace(/^["'`]+|["'`]+$/g, "")
       .replace(/\s+/g, " ")
       .slice(0, 60);
-    return cleaned || fallbackTitle(firstMessage);
-  } catch {
-    return fallbackTitle(firstMessage);
+    return cleaned || fallback;
+  } catch (err) {
+    console.error("generateChatTitle failed:", err);
+    return fallback;
   }
-}
-
-function fallbackTitle(message: string): string {
-  const words = message.trim().split(/\s+/).slice(0, 6).join(" ");
-  return words.length > 40 ? `${words.slice(0, 40)}…` : words || "New Chat";
 }
