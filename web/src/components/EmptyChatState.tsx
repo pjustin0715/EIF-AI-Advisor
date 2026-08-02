@@ -2,6 +2,7 @@
 
 import { ADVISOR_NAMES, getSuggestions } from "@/lib/suggestions";
 import SuggestionChips from "./SuggestionChips";
+import SpeechMicButton from "./SpeechMicButton";
 
 interface Props {
   input: string;
@@ -11,6 +12,9 @@ interface Props {
   onInputChange: (value: string) => void;
   onSend: () => void;
   onSuggestionSelect: (query: string) => void;
+  speechListening: boolean;
+  speechError: string | null;
+  onSpeechToggle: () => void;
 }
 
 export default function EmptyChatState({
@@ -21,6 +25,9 @@ export default function EmptyChatState({
   onInputChange,
   onSend,
   onSuggestionSelect,
+  speechListening,
+  speechError,
+  onSpeechToggle,
 }: Props) {
   const suggestions = getSuggestions(advisorId);
   const advisorName = ADVISOR_NAMES[advisorId] ?? "EIF Advisor";
@@ -47,6 +54,11 @@ export default function EmptyChatState({
           ))}
         </div>
 
+        {speechError && (
+          <p className="speech-error" role="alert">
+            {speechError}
+          </p>
+        )}
         <div className="empty-input-area">
           <input
             type="text"
@@ -56,6 +68,12 @@ export default function EmptyChatState({
             onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && onSend()}
             autoFocus
+          />
+          <SpeechMicButton
+            listening={speechListening}
+            onClick={onSpeechToggle}
+            disabled={loading}
+            variant="empty"
           />
           <button disabled={loading || !input.trim()} onClick={onSend} type="button">
             <svg viewBox="0 0 24 24">

@@ -59,6 +59,8 @@ import NewChatModal from "./NewChatModal";
 import RetrievalPanel from "./RetrievalPanel";
 import Sidebar from "./Sidebar";
 import SuggestionChips from "./SuggestionChips";
+import SpeechMicButton from "./SpeechMicButton";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 interface Message {
   role: "user" | "model" | "assistant";
   content: string;
@@ -294,6 +296,20 @@ export default function ChatInterface() {
       setPendingDraft(value);
     }
   }
+
+  const {
+    listening: speechListening,
+    error: speechError,
+    stop: stopSpeech,
+    toggle: toggleSpeech,
+  } = useSpeechRecognition({
+    onTranscript: handleInputChange,
+    getBaseText: () => input,
+  });
+
+  useEffect(() => {
+    stopSpeech();
+  }, [activeChatId, isAuthenticated, stopSpeech]);
   function handleLogout() {
     abortRef.current?.abort();
     setIsAuthenticated(false);
@@ -421,8 +437,12 @@ export default function ChatInterface() {
     if (res.ok) {
       const { share_token } = await res.json();
       const url = `${window.location.origin}/share/${share_token}`;
-      navigator.clipboard.writeText(url);
       setShareUrl(url);
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        // Ignore clipboard failures (e.g. document not focused); the share dialog still shows the URL to copy manually.
+      }
     }
   }
   function handleRename(id: string) {
@@ -845,6 +865,9 @@ export default function ChatInterface() {
             onInputChange={handleInputChange}
             onSend={() => sendMessage()}
             onSuggestionSelect={(query) => sendMessage(query)}
+            speechListening={speechListening}
+            speechError={speechError}
+            onSpeechToggle={toggleSpeech}
           />
         ) : (
           <>
@@ -1071,6 +1094,11 @@ export default function ChatInterface() {
                   </ul>
                 </div>
               )}
+              {speechError && (
+                <p className="speech-error" role="alert">
+                  {speechError}
+                </p>
+              )}
               <div className="input-area">
                 <input
                   ref={inputRef}
@@ -1114,6 +1142,11 @@ export default function ChatInterface() {
                     onCompact={handleManualCompact}
                   />
                 )}
+                <SpeechMicButton
+                  listening={speechListening}
+                  onClick={toggleSpeech}
+                  disabled={!isAuthenticated || !activeChatId}
+                />
                 {loading ? (
                   <>
                     <button
