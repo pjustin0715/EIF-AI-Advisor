@@ -24,6 +24,91 @@ import {
   stripRetrievalForViewer,
 } from "@/lib/retrieval";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import {
+  buildTurnLock,
+  turnLockExpiryIso,
+  type TurnLock,
+} from "@/lib/turn-lock";
+
+const LOCK_REFRESH_MS = 20_000;
+
+async function acquireTurnLock(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  chatId: string,
+  userEmail: string
+): Promise<{ ok: true } | { ok: false; turn_lock: TurnLock }> {
+  const now = new Date();
+  const { data: current } = await supabase
+    .from("chats")
+    .select("turn_locked_by, turn_locked_until")
+    .eq("id", chatId)
+    .maybeSingle();
+
+  const existing = buildTurnLock(
+    current?.turn_locked_by as string | null,
+    current?.turn_locked_until as string | null,
+    now
+  );
+
+  if (existing.active && existing.by !== userEmail) {
+    return { ok: false, turn_lock: existing };
+  }
+
+  const expiry = turnLockExpiryIso(now);
+  const { data: acquired } = await supabase
+    .from("chats")
+    .update({
+      turn_locked_by: userEmail,
+      turn_locked_until: expiry,
+    })
+    .eq("id", chatId)
+    .or(
+      `turn_locked_until.is.null,turn_locked_until.lte.${now.toISOString()},turn_locked_by.eq.${userEmail}`
+    )
+    .select("id")
+    .maybeSingle();
+
+  if (!acquired) {
+    const { data: latest } = await supabase
+      .from("chats")
+      .select("turn_locked_by, turn_locked_until")
+      .eq("id", chatId)
+      .maybeSingle();
+    return {
+      ok: false,
+      turn_lock: buildTurnLock(
+        latest?.turn_locked_by as string | null,
+        latest?.turn_locked_until as string | null
+      ),
+    };
+  }
+
+  return { ok: true };
+}
+
+async function refreshTurnLock(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  chatId: string,
+  userEmail: string
+) {
+  await supabase
+    .from("chats")
+    .update({ turn_locked_until: turnLockExpiryIso() })
+    .eq("id", chatId)
+    .eq("turn_locked_by", userEmail);
+}
+
+async function releaseTurnLock(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  chatId: string,
+  userEmail: string
+) {
+  await supabase
+    .from("chats")
+    .update({ turn_locked_by: null, turn_locked_until: null })
+    .eq("id", chatId)
+    .eq("turn_locked_by", userEmail);
+}
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req);
@@ -35,7 +120,7 @@ export async function POST(req: NextRequest) {
 
   const userEmail = user.email;
   const startTime = Date.now();
-  const { prompt, chat_id } = await req.json();
+  const { prompt, chat_id, share_token } = await req.json();
 
   if (!prompt || !chat_id) {
     return new Response(JSON.stringify({ error: "Missing prompt or chat_id" }), {
@@ -44,12 +129,18 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = getSupabaseAdmin();
-  const { data: chat } = await supabase
-    .from("chats")
-    .select("*")
-    .eq("id", chat_id)
-    .eq("user_email", userEmail)
-    .maybeSingle();
+
+  let chatQuery = supabase.from("chats").select("*").eq("id", chat_id);
+
+  if (share_token) {
+    chatQuery = chatQuery
+      .eq("share_token", share_token)
+      .not("shared_at", "is", null);
+  } else {
+    chatQuery = chatQuery.eq("user_email", userEmail);
+  }
+
+  const { data: chat } = await chatQuery.maybeSingle();
 
   if (!chat) {
     return new Response(JSON.stringify({ error: "Chat not found" }), {
@@ -57,10 +148,29 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const isOwner = chat.user_email === userEmail;
+  if (!isOwner && !share_token) {
+    return new Response(JSON.stringify({ error: "Chat not found" }), {
+      status: 404,
+    });
+  }
+
+  const lockResult = await acquireTurnLock(supabase, chat_id, userEmail);
+  if (!lockResult.ok) {
+    return new Response(
+      JSON.stringify({
+        error: "Turn in progress",
+        turn_lock: lockResult.turn_lock,
+      }),
+      { status: 409 }
+    );
+  }
+
   await supabase.from("messages").insert({
     chat_id,
     role: "user",
     content: prompt,
+    author_email: userEmail,
   });
 
   const { data: historyRows } = await supabase
@@ -70,12 +180,13 @@ export async function POST(req: NextRequest) {
     .order("created_at", { ascending: true });
 
   const history = (historyRows || []) as HistoryMessage[];
-  const shouldAutoTitle = isDefaultChatTitle(chat.title as string);
+  const shouldAutoTitle = isOwner && isDefaultChatTitle(chat.title as string);
 
   let ragContext;
   try {
     ragContext = await retrieveContext(prompt, chat.advisor_id || "advisor1");
   } catch (err) {
+    await releaseTurnLock(supabase, chat_id, userEmail);
     const message =
       err instanceof Error ? err.message : "RAG service unavailable";
     await supabase.from("turn_logs").insert({
@@ -151,6 +262,7 @@ export async function POST(req: NextRequest) {
       const encoder = new TextEncoder();
       let fullText = "";
       let completionTokens = 0;
+      let lastLockRefresh = Date.now();
       const { data: advisorModel } = await supabase
         .from("advisor_models")
         .select("model_name")
@@ -166,6 +278,12 @@ export async function POST(req: NextRequest) {
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)
         );
+      };
+
+      const maybeRefreshLock = async () => {
+        if (Date.now() - lastLockRefresh < LOCK_REFRESH_MS) return;
+        lastLockRefresh = Date.now();
+        await refreshTurnLock(supabase, chat_id, userEmail);
       };
 
       const persistAndSendTitle = async (newTitle: string) => {
@@ -239,6 +357,7 @@ export async function POST(req: NextRequest) {
             fullText += text;
             completionTokens += estimateTokens(text);
             send({ type: "token", text });
+            await maybeRefreshLock();
           }
         }
 
@@ -351,6 +470,7 @@ export async function POST(req: NextRequest) {
           });
         }
       } finally {
+        await releaseTurnLock(supabase, chat_id, userEmail);
         controller.close();
       }
     },

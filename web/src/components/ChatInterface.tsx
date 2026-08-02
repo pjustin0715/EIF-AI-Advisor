@@ -64,9 +64,23 @@ import Sidebar from "./Sidebar";
 import SuggestionChips from "./SuggestionChips";
 import SpeechMicButton from "./SpeechMicButton";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import type { TurnLock } from "@/lib/turn-lock";
+
+const POLL_INTERVAL_MS = 2000;
+
+function displayNameFromEmail(email: string | null | undefined): string {
+  if (!email) return "User";
+  const local = email.split("@")[0] || email;
+  return local
+    .replace(/[._-]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 interface Message {
+  id?: string;
   role: "user" | "model" | "assistant";
   content: string;
+  author_email?: string | null;
   citations?: RetrievalPayload | string[] | null;
   suggestion?: string | null;
 }
@@ -75,6 +89,8 @@ interface Chat {
   title: string;
   advisor_id: string;
   pinned?: boolean;
+  shared_at?: string | null;
+  share_token?: string | null;
 }
 interface QueuedPrompt {
   id: string;
@@ -93,7 +109,14 @@ function isAbortError(err: unknown): boolean {
   return false;
 }
 
-export default function ChatInterface() {
+export default function ChatInterface({
+  mode = "owner",
+  shareToken,
+}: {
+  mode?: "owner" | "shared";
+  shareToken?: string;
+} = {}) {
+  const isSharedMode = mode === "shared";
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [chatsLoading, setChatsLoading] = useState(true);
@@ -122,7 +145,18 @@ export default function ChatInterface() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareDialog, setShareDialog] = useState<{
+    url: string;
+    chatId: string;
+    isShared: boolean;
+  } | null>(null);
+  const [turnLock, setTurnLock] = useState<TurnLock | null>(null);
+  const [activeChatMeta, setActiveChatMeta] = useState<{
+    shared_at?: string | null;
+    share_token?: string | null;
+    title?: string;
+  } | null>(null);
+  const [sharedRoomError, setSharedRoomError] = useState("");
   const [renameTarget, setRenameTarget] = useState<{ id: string; title: string } | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [contextUsage, setContextUsage] = useState<ContextUsage | null>(null);
@@ -137,7 +171,8 @@ export default function ChatInterface() {
   const loadingRef = useRef(false);
   const queuesRef = useRef<Record<string, QueuedPrompt[]>>({});
   const streamingChatIdRef = useRef<string | null>(null);
-  const showEmptyState = isAuthenticated && !chatsLoading && chats.length === 0;
+  const showEmptyState =
+    !isSharedMode && isAuthenticated && !chatsLoading && chats.length === 0;
 
   function setLoadingFlag(value: boolean) {
     loadingRef.current = value;
@@ -212,6 +247,34 @@ export default function ChatInterface() {
       chatboxRef.current.scrollTop = chatboxRef.current.scrollHeight;
     }
   }, []);
+  const loadSharedRoom = useCallback(async () => {
+    if (!shareToken) return;
+    setMessagesLoading(true);
+    setSharedRoomError("");
+    const res = await fetch(`/api/share/${shareToken}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      if (res.status === 404) setSharedRoomError("Shared chat not found.");
+      else if (res.status === 401) setSharedRoomError("Unauthorized access.");
+      else setSharedRoomError("Failed to load shared chat.");
+      setMessagesLoading(false);
+      return;
+    }
+    const data = await res.json();
+    setActiveChatId(data.chat.id);
+    activeChatIdRef.current = data.chat.id;
+    setActiveChatMeta({
+      shared_at: data.chat.shared_at,
+      share_token: data.chat.share_token,
+      title: data.chat.title,
+    });
+    setMessages(data.messages || []);
+    setTurnLock(data.turn_lock || null);
+    const advId = data.chat?.advisor_id;
+    if (advId) setActiveAdvisorId(advId);
+    setMessagesLoading(false);
+  }, [shareToken]);
   const loadMessages = useCallback(async (chatId: string) => {
     setMessagesLoading(true);
     const res = await fetch(`/api/chats/${chatId}`, { headers: authHeaders() });
@@ -222,6 +285,12 @@ export default function ChatInterface() {
     const data = await res.json();
     setMessages(data.messages || []);
     setContextSummary(data.chat?.context_summary ?? null);
+    setActiveChatMeta({
+      shared_at: data.chat?.shared_at ?? null,
+      share_token: data.chat?.share_token ?? null,
+      title: data.chat?.title,
+    });
+    setTurnLock(data.turn_lock || null);
     if (data.context_usage) {
       setContextUsage(data.context_usage);
     } else {
@@ -256,25 +325,30 @@ export default function ChatInterface() {
     if (token) {
       setIsAuthenticated(true);
       setIsAdmin(isAdminUser());
-      
-      fetch("/api/advisors")
-        .then(r => r.json())
-        .then(data => {
-          setAdvisorMap(data);
-          const first = Object.keys(data)[0];
-          if (first) {
-            setEmptyAdvisorId((current) =>
-              current === "advisor1" && !data[current] ? first : current
-            );
-          }
-        })
-        .catch(() => {});
-      loadChats();
-      fetch("/api/wakeup").catch(() => {});
+
+      if (isSharedMode) {
+        loadSharedRoom();
+      } else {
+        fetch("/api/advisors")
+          .then((r) => r.json())
+          .then((data) => {
+            setAdvisorMap(data);
+            const first = Object.keys(data)[0];
+            if (first) {
+              setEmptyAdvisorId((current) =>
+                current === "advisor1" && !data[current] ? first : current
+              );
+            }
+          })
+          .catch(() => {});
+        loadChats();
+        fetch("/api/wakeup").catch(() => {});
+      }
     } else {
       setChatsLoading(false);
+      if (isSharedMode) setMessagesLoading(false);
     }
-  }, [loadChats]);
+  }, [loadChats, loadSharedRoom, isSharedMode]);
   // Restore draft when switching chats
   useEffect(() => {
     const prev = prevChatIdRef.current;
@@ -290,13 +364,65 @@ export default function ChatInterface() {
     activeChatIdRef.current = activeChatId;
   }, [activeChatId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!activeChatId || !isAuthenticated) return;
+    if (!activeChatId || !isAuthenticated || isSharedMode) return;
     if (skipLoadRef.current) {
       skipLoadRef.current = false;
       return;
     }
     loadMessages(activeChatId);
-  }, [activeChatId, isAuthenticated, loadMessages]);
+  }, [activeChatId, isAuthenticated, isSharedMode, loadMessages]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const shouldPoll =
+      isSharedMode ||
+      Boolean(activeChatId && activeChatMeta?.shared_at);
+    if (!shouldPoll) return;
+
+    const poll = async () => {
+      try {
+        if (isSharedMode && shareToken) {
+          const res = await fetch(`/api/share/${shareToken}`, {
+            headers: authHeaders(),
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          setTurnLock(data.turn_lock || null);
+          if (!loadingRef.current) {
+            setMessages(data.messages || []);
+          }
+          return;
+        }
+        if (!activeChatId || !activeChatMeta?.shared_at) return;
+        const res = await fetch(`/api/chats/${activeChatId}`, {
+          headers: authHeaders(),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setTurnLock(data.turn_lock || null);
+        setActiveChatMeta({
+          shared_at: data.chat?.shared_at ?? null,
+          share_token: data.chat?.share_token ?? null,
+          title: data.chat?.title,
+        });
+        if (!loadingRef.current) {
+          setMessages(data.messages || []);
+          if (data.context_usage) setContextUsage(data.context_usage);
+        }
+      } catch {
+        // ignore transient poll errors
+      }
+    };
+
+    const id = window.setInterval(poll, POLL_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [
+    isAuthenticated,
+    isSharedMode,
+    shareToken,
+    activeChatId,
+    activeChatMeta?.shared_at,
+  ]);
   useEffect(() => {
     scrollToBottom();
   }, [messages, streamingText, scrollToBottom]);

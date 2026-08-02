@@ -11,6 +11,7 @@ import {
 } from "@/lib/context-window";
 import { citationsForViewer } from "@/lib/retrieval";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { buildTurnLock } from "@/lib/turn-lock";
 
 /** Approximate system + RAG overhead when no live system prompt is available. */
 const SYSTEM_OVERHEAD_TOKENS = 2500;
@@ -68,6 +69,11 @@ export async function GET(
     ),
   }));
 
+  const turn_lock = buildTurnLock(
+    chat.turn_locked_by as string | null,
+    chat.turn_locked_until as string | null
+  );
+
   return NextResponse.json({
     chat: {
       ...chat,
@@ -76,6 +82,7 @@ export async function GET(
     },
     messages: safeMessages,
     context_usage,
+    turn_lock,
   });
 }
 

@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { visibleMessages, type HistoryMessage } from "@/lib/context-window";
 import { citationsForViewer } from "@/lib/retrieval";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { buildTurnLock } from "@/lib/turn-lock";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,6 @@ export async function GET(
     .from("messages")
     .select("*")
     .eq("chat_id", chat.id)
-    .lte("created_at", chat.shared_at)
     .order("created_at", { ascending: true });
 
   const isAdmin = user.role === "admin";
@@ -44,8 +44,21 @@ export async function GET(
     ),
   }));
 
+  const turn_lock = buildTurnLock(
+    chat.turn_locked_by as string | null,
+    chat.turn_locked_until as string | null
+  );
+
   return NextResponse.json({
-    chat,
+    chat: {
+      id: chat.id,
+      title: chat.title,
+      advisor_id: chat.advisor_id,
+      shared_at: chat.shared_at,
+      share_token: chat.share_token,
+      user_email: chat.user_email,
+    },
     messages: safeMessages,
+    turn_lock,
   });
 }
