@@ -489,6 +489,31 @@ body {
   color: var(--primary);
 }
 
+.context-meter-compact-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.context-meter-compact-btn:hover:not(:disabled) {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.context-meter-compact-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .input-area input {
   flex-grow: 1;
   border: none;

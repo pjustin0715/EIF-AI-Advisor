@@ -154,14 +154,16 @@ export type CompactResult = {
 };
 
 /**
- * If history+system exceed the compact threshold, summarize older turns and
- * keep the most recent KEEP_RECENT_MESSAGES verbatim.
+ * Summarize older turns and keep the most recent KEEP_RECENT_MESSAGES verbatim.
+ * Auto mode runs only when usage crosses COMPACT_THRESHOLD.
+ * Pass force: true for manual compact (ignores threshold).
  */
 export async function maybeCompactHistory(opts: {
   systemPrompt: string;
   history: HistoryMessage[];
   existingSummary?: string | null;
   compactedThroughAt?: string | null;
+  force?: boolean;
 }): Promise<CompactResult> {
   const activeHistory = filterHistoryForPrompt(
     opts.history,
@@ -174,7 +176,11 @@ export async function maybeCompactHistory(opts: {
     opts.existingSummary
   );
 
-  if (!needsCompaction(used) || activeHistory.length <= KEEP_RECENT_MESSAGES) {
+  const shouldCompact =
+    opts.force ||
+    (needsCompaction(used) && activeHistory.length > KEEP_RECENT_MESSAGES);
+
+  if (!shouldCompact || activeHistory.length <= KEEP_RECENT_MESSAGES) {
     return {
       summary: opts.existingSummary || "",
       compactedThroughAt: opts.compactedThroughAt || "",
@@ -207,6 +213,22 @@ export async function maybeCompactHistory(opts: {
     keptHistory,
     compacted: true,
   };
+}
+
+/** Manual compact: always attempt if there are older turns to summarize. */
+export async function forceCompactHistory(opts: {
+  systemPrompt?: string;
+  history: HistoryMessage[];
+  existingSummary?: string | null;
+  compactedThroughAt?: string | null;
+}): Promise<CompactResult> {
+  return maybeCompactHistory({
+    systemPrompt: opts.systemPrompt || "",
+    history: opts.history,
+    existingSummary: opts.existingSummary,
+    compactedThroughAt: opts.compactedThroughAt,
+    force: true,
+  });
 }
 
 export function contextUsageFromPrompt(opts: {

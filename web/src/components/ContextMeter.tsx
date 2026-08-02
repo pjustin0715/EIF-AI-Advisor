@@ -11,6 +11,8 @@ import {
 type Props = {
   usage: ContextUsage | null;
   compacting?: boolean;
+  canCompact?: boolean;
+  onCompact?: () => void;
 };
 
 function levelClass(percent: number): string {
@@ -19,7 +21,12 @@ function levelClass(percent: number): string {
   return "context-meter--ok";
 }
 
-export default function ContextMeter({ usage, compacting }: Props) {
+export default function ContextMeter({
+  usage,
+  compacting,
+  canCompact,
+  onCompact,
+}: Props) {
   const limit =
     usage?.limit ||
     usableContextTokens(
@@ -34,7 +41,7 @@ export default function ContextMeter({ usage, compacting }: Props) {
     <div
       className={`context-meter ${levelClass(percent)}`}
       title={`Context window: ${used.toLocaleString()} / ${limit.toLocaleString()} tokens${
-        compacted ? " (auto-compacted)" : ""
+        compacted ? " (compacted)" : ""
       }`}
       aria-label={`Context window ${percent}% full`}
     >
@@ -52,6 +59,17 @@ export default function ContextMeter({ usage, compacting }: Props) {
           <span className="context-meter-badge">compacted</span>
         ) : null}
       </span>
+      {onCompact ? (
+        <button
+          type="button"
+          className="context-meter-compact-btn"
+          onClick={onCompact}
+          disabled={!canCompact || compacting}
+          title="Summarize older turns to free context"
+        >
+          Compact
+        </button>
+      ) : null}
     </div>
   );
 }
