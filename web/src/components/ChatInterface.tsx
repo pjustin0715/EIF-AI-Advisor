@@ -50,10 +50,23 @@ interface Chat {
   title: string;
   advisor_id: string;
 }
+interface QueuedPrompt {
+  id: string;
+  text: string;
+}
 type PendingDelete =
   | { type: "single"; ids: string[] }
   | { type: "bulk"; ids: string[] }
   | null;
+
+function isAbortError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const name = "name" in err ? String((err as { name: unknown }).name) : "";
+  if (name === "AbortError" || name === "APIUserAbortError") return true;
+  if (err instanceof Error && /aborted|abort/i.test(err.message)) return true;
+  return false;
+}
+
 export default function ChatInterface() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);

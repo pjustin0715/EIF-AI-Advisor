@@ -292,6 +292,7 @@ export default function RetrievalPanel({
                   aria-expanded={isExpanded}
                   onClick={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     setExpandedStep((prev) => (prev === step ? null : step));
                   }}
                 >
