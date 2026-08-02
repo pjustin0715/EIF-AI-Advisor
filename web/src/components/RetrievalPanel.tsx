@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type {
   RetrievalPayload,
   RetrievalSource,
@@ -20,16 +20,78 @@ type RetrievalPanelProps = {
   statusStep?: RetrievalStatusStep | null;
   rankingCount?: number | null;
   isAdmin?: boolean;
-  /** User question used for the DNA search (live panel). */
   query?: string | null;
-  /** Live trace during loading (before answer tokens). */
   mode?: "live" | "finished";
 };
 
 function formatSimilarity(similarity?: number): string | null {
   if (typeof similarity !== "number" || Number.isNaN(similarity)) return null;
   const pct = similarity <= 1 ? similarity * 100 : similarity;
-  return `${pct.toFixed(0)}% match`;
+  return `${pct.toFixed(0)}%`;
+}
+
+function IconSearch() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
+      <path d="M16 16l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconRank() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M4 7h12M4 12h16M4 17h9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M5 12.5l4.5 4.5L19 7.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconChevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      className={`retrieval-step__chevron-icon${open ? " is-open" : ""}`}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        d="M9 6l6 6-6 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function stepIcon(step: RetrievalStatusStep, done: boolean): ReactNode {
+  if (done && step === "ready") return <IconCheck />;
+  if (step === "searching") return <IconSearch />;
+  if (step === "ranking") return <IconRank />;
+  return <IconCheck />;
 }
 
 function SourceList({
@@ -47,10 +109,15 @@ function SourceList({
       {sources.map((source, index) => {
         const sim = isAdmin ? formatSimilarity(source.similarity) : null;
         return (
-          <li key={source.id || `${source.heading}-${index}`}>
-            <div className="retrieval-source__heading">
-              {source.heading}
-              {sim && <span className="retrieval-source__meta">{sim}</span>}
+          <li
+            key={source.id || `${source.heading}-${index}`}
+            className="retrieval-source"
+          >
+            <div className="retrieval-source__top">
+              <span className="retrieval-source__heading">{source.heading}</span>
+              {sim && (
+                <span className="retrieval-source__badge">{sim} match</span>
+              )}
             </div>
             {source.excerpt && (
               <p className="retrieval-source__excerpt">{source.excerpt}</p>
@@ -91,7 +158,7 @@ function StepContext({
   if (step === "searching") {
     return (
       <div className="retrieval-step__context">
-        <p>
+        <p className="retrieval-step__prose">
           Looking up DNA sections related to your question
           {query?.trim() ? ":" : "."}
         </p>
@@ -106,24 +173,21 @@ function StepContext({
     if (!retrieval) {
       return (
         <div className="retrieval-step__context">
-          <p className="retrieval-step__empty">
-            Waiting for ranked DNA matches…
-          </p>
+          <p className="retrieval-step__empty">Waiting for ranked DNA matches…</p>
         </div>
       );
     }
     return (
       <div className="retrieval-step__context">
-        <p>
+        <p className="retrieval-step__prose">
           Ranked {count} DNA section{count === 1 ? "" : "s"} by relevance
-          {retrieval.low_grounding ? " (limited match)" : ""}.
+          {retrieval.low_grounding ? " — limited match strength" : ""}.
         </p>
         <SourceList sources={sources} isAdmin={isAdmin} />
       </div>
     );
   }
 
-  // ready
   if (!retrieval) {
     return (
       <div className="retrieval-step__context">
@@ -131,6 +195,7 @@ function StepContext({
       </div>
     );
   }
+
   return (
     <div className="retrieval-step__context">
       {retrieval.low_grounding && (
@@ -139,7 +204,7 @@ function StepContext({
           instructions.
         </p>
       )}
-      <p>
+      <p className="retrieval-step__prose">
         Using {sources.length} retrieved section
         {sources.length === 1 ? "" : "s"} to draft the answer.
       </p>
@@ -158,6 +223,77 @@ function StepContext({
   );
 }
 
+function Timeline({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <ol className={`retrieval-timeline ${className}`.trim()}>{children}</ol>
+  );
+}
+
+function TimelineStep({
+  step,
+  label,
+  reached,
+  active,
+  done,
+  expanded,
+  onToggle,
+  children,
+}: {
+  step: RetrievalStatusStep;
+  label: string;
+  reached: boolean;
+  active: boolean;
+  done: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <li
+      className={[
+        "retrieval-step",
+        reached ? "retrieval-step--reached" : "",
+        active ? "retrieval-step--active" : "",
+        done ? "retrieval-step--done" : "",
+        expanded ? "retrieval-step--expanded" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <button
+        type="button"
+        className="retrieval-step__button"
+        disabled={!reached}
+        aria-expanded={expanded}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (reached) onToggle();
+        }}
+      >
+        <span
+          className={`retrieval-step__icon${done ? " retrieval-step__icon--done" : ""}`}
+          aria-hidden="true"
+        >
+          {stepIcon(step, done)}
+        </span>
+        <span className="retrieval-step__label">{label}</span>
+        {done && !active && (
+          <span className="retrieval-step__status">Done</span>
+        )}
+        {reached && <IconChevron open={expanded} />}
+      </button>
+      {expanded && children}
+    </li>
+  );
+}
+
 export default function RetrievalPanel({
   retrieval,
   statusStep = null,
@@ -169,9 +305,8 @@ export default function RetrievalPanel({
   const [expandedStep, setExpandedStep] = useState<RetrievalStatusStep | null>(
     null
   );
+  const [finishedOpen, setFinishedOpen] = useState(false);
 
-  // Auto-open the active/latest available step so context appears as data arrives;
-  // user can still click to switch or collapse.
   useEffect(() => {
     if (mode !== "live") return;
     if (statusStep === "ready" && retrieval) {
@@ -193,8 +328,8 @@ export default function RetrievalPanel({
     const activeIndex = statusStep ? STEP_ORDER.indexOf(statusStep) : 0;
     return (
       <div className="retrieval-panel retrieval-panel--live" aria-live="polite">
-        <div className="retrieval-panel__label">Grounding</div>
-        <ol className="retrieval-steps">
+        <div className="retrieval-panel__eyebrow">Grounding</div>
+        <Timeline>
           {STEP_ORDER.map((step, index) => {
             const done = index < activeIndex || statusStep === "ready";
             const active = step === statusStep && statusStep !== "ready";
@@ -207,48 +342,29 @@ export default function RetrievalPanel({
             }
 
             return (
-              <li
+              <TimelineStep
                 key={step}
-                className={[
-                  "retrieval-step",
-                  readyDone || done ? "retrieval-step--done" : "",
-                  active ? "retrieval-step--active" : "",
-                  isExpanded ? "retrieval-step--expanded" : "",
-                  reached ? "retrieval-step--clickable" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                step={step}
+                label={label}
+                reached={reached}
+                active={active}
+                done={done || readyDone}
+                expanded={isExpanded}
+                onToggle={() =>
+                  setExpandedStep((prev) => (prev === step ? null : step))
+                }
               >
-                <button
-                  type="button"
-                  className="retrieval-step__button"
-                  disabled={!reached}
-                  aria-expanded={isExpanded}
-                  onClick={() =>
-                    setExpandedStep((prev) => (prev === step ? null : step))
-                  }
-                >
-                  <span className="retrieval-step__marker" aria-hidden="true" />
-                  <span className="retrieval-step__label">{label}</span>
-                  {reached && (
-                    <span className="retrieval-step__chevron" aria-hidden="true">
-                      {isExpanded ? "▾" : "▸"}
-                    </span>
-                  )}
-                </button>
-                {isExpanded && (
-                  <StepContext
-                    step={step}
-                    retrieval={retrieval}
-                    query={query}
-                    isAdmin={isAdmin}
-                    rankingCount={rankingCount}
-                  />
-                )}
-              </li>
+                <StepContext
+                  step={step}
+                  retrieval={retrieval}
+                  query={query}
+                  isAdmin={isAdmin}
+                  rankingCount={rankingCount}
+                />
+              </TimelineStep>
             );
           })}
-        </ol>
+        </Timeline>
       </div>
     );
   }
@@ -264,45 +380,40 @@ export default function RetrievalPanel({
       : "How this was grounded";
 
   return (
-    <details className="retrieval-panel retrieval-panel--finished">
-      <summary className="retrieval-panel__summary">{summary}</summary>
-      <div className="retrieval-panel__body">
-        <ol className="retrieval-steps retrieval-steps--finished">
-          {STEP_ORDER.map((step) => {
-            const isExpanded = expandedStep === step;
-            let label = STEP_LABELS[step];
-            if (step === "ranking" && count > 0) {
-              label = `Ranking matches (${count})`;
-            }
-            return (
-              <li
-                key={step}
-                className={[
-                  "retrieval-step",
-                  "retrieval-step--done",
-                  "retrieval-step--clickable",
-                  isExpanded ? "retrieval-step--expanded" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <button
-                  type="button"
-                  className="retrieval-step__button"
-                  aria-expanded={isExpanded}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setExpandedStep((prev) => (prev === step ? null : step));
-                  }}
+    <div
+      className={`retrieval-panel retrieval-panel--finished${finishedOpen ? " is-open" : ""}`}
+    >
+      <button
+        type="button"
+        className="retrieval-panel__summary"
+        aria-expanded={finishedOpen}
+        onClick={() => setFinishedOpen((open) => !open)}
+      >
+        <IconChevron open={finishedOpen} />
+        <span>{summary}</span>
+      </button>
+      {finishedOpen && (
+        <div className="retrieval-panel__body">
+          <Timeline className="retrieval-timeline--finished">
+            {STEP_ORDER.map((step) => {
+              const isExpanded = expandedStep === step;
+              let label = STEP_LABELS[step];
+              if (step === "ranking" && count > 0) {
+                label = `Ranking matches (${count})`;
+              }
+              return (
+                <TimelineStep
+                  key={step}
+                  step={step}
+                  label={label}
+                  reached
+                  active={false}
+                  done
+                  expanded={isExpanded}
+                  onToggle={() =>
+                    setExpandedStep((prev) => (prev === step ? null : step))
+                  }
                 >
-                  <span className="retrieval-step__marker" aria-hidden="true" />
-                  <span className="retrieval-step__label">{label}</span>
-                  <span className="retrieval-step__chevron" aria-hidden="true">
-                    {isExpanded ? "▾" : "▸"}
-                  </span>
-                </button>
-                {isExpanded && (
                   <StepContext
                     step={step}
                     retrieval={retrieval}
@@ -310,12 +421,12 @@ export default function RetrievalPanel({
                     isAdmin={isAdmin}
                     rankingCount={count}
                   />
-                )}
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-    </details>
+                </TimelineStep>
+              );
+            })}
+          </Timeline>
+        </div>
+      )}
+    </div>
   );
 }

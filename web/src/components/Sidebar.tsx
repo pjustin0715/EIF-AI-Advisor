@@ -1,5 +1,15 @@
 "use client";
-import { MessageCircle, MoreHorizontal, PanelLeft, Plus, SlidersHorizontal, X } from "lucide-react";
+import {
+  MessageCircle,
+  MoreVertical,
+  PanelLeft,
+  Pencil,
+  Plus,
+  Share2,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -159,14 +169,16 @@ export default function Sidebar({
                           type="button"
                           aria-label="Chat options"
                         >
-                          <MoreHorizontal className="h-4 w-4" />
+                          <MoreVertical className="h-4 w-4" />
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" side="bottom">
+                      <DropdownMenuContent align="start" side="right" sideOffset={8}>
                         <DropdownMenuItem onSelect={() => onShare(chat.id)}>
+                          <Share2 className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
                           Share
                         </DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => onRename(chat.id)}>
+                          <Pencil className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
                           Rename
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
@@ -174,6 +186,7 @@ export default function Sidebar({
                           variant="destructive"
                           onSelect={() => onDelete(chat.id)}
                         >
+                          <Trash2 className="h-4 w-4 shrink-0" />
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
