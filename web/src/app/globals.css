@@ -238,14 +238,29 @@ body {
   min-width: 0;
 }
 
+.chat-options-container {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
   opacity: 0;
   flex-shrink: 0;
-  margin-left: auto;
+  padding: 0 4px;
+  height: 24px;
+  line-height: 1;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
 }
 
 .chat-item:hover .delete-btn {

@@ -124,7 +124,6 @@ export default function Sidebar({
                   <div className="chat-options-container" style={{ position: "relative" }}>
                     <button
                       className="delete-btn"
-                      style={{ fontSize: "16px", fontWeight: "bold", padding: "0 4px" }}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (openDropdownId === chat.id) {
@@ -138,7 +137,7 @@ export default function Sidebar({
                       type="button"
                       aria-label="Chat options"
                     >
-                      ...
+                      ⋯
                     </button>
                     {openDropdownId === chat.id && (
                       <div className="dropdown-menu" style={{ 
