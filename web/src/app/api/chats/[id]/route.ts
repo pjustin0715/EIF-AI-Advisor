@@ -113,9 +113,9 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { title } = await req.json();
-  if (!title) {
-    return NextResponse.json({ error: "Missing title" }, { status: 400 });
+  const { title, pinned } = await req.json();
+  if (title === undefined && pinned === undefined) {
+    return NextResponse.json({ error: "Missing title or pinned" }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();
@@ -130,13 +130,11 @@ export async function PATCH(
     return NextResponse.json({ error: "Chat not found" }, { status: 404 });
   }
 
-  const { data: updatedChat, error: updateError } = await supabase
-    .from("chats")
-    .update({ title, updated_at: new Date().toISOString() })
-    .eq("id", params.id)
-    .select();
-    
-  console.log("PATCH update result:", { paramsId: params.id, title, updatedChat, updateError });
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (title !== undefined) updates.title = title;
+  if (pinned !== undefined) updates.pinned = pinned;
+
+  await supabase.from("chats").update(updates).eq("id", params.id);
 
   return NextResponse.json({ status: "success" });
 }

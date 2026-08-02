@@ -7,6 +7,7 @@ import {
   clearAccessToken,
   getAccessToken,
   getProfilePicture,
+  getTokenPayload,
   isAdminUser,
 } from "@/lib/auth-client";
 import {
@@ -54,7 +55,7 @@ import { Input } from "@/components/ui/input";
 import CopyMessageButton from "./CopyMessageButton";
 import EmptyChatState from "./EmptyChatState";
 import ContextMeter from "./ContextMeter";
-import LoginOverlay, { LogoutButton } from "./LoginOverlay";
+import LoginOverlay from "./LoginOverlay";
 import NewChatModal from "./NewChatModal";
 import RetrievalPanel from "./RetrievalPanel";
 import ChatMessagesSkeleton from "./ChatMessagesSkeleton";
@@ -73,6 +74,7 @@ interface Chat {
   id: string;
   title: string;
   advisor_id: string;
+  pinned?: boolean;
 }
 interface QueuedPrompt {
   id: string;
@@ -465,6 +467,21 @@ export default function ChatInterface() {
       }
     }
   }
+  async function handlePin(id: string) {
+    const chat = chats.find((c) => c.id === id);
+    if (!chat) return;
+    const pinned = !chat.pinned;
+    setChats((prev) =>
+      prev
+        .map((c) => (c.id === id ? { ...c, pinned } : c))
+        .sort((a, b) => Number(b.pinned) - Number(a.pinned))
+    );
+    await fetch(`/api/chats/${id}`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ pinned }),
+    });
+  }
   function handleRename(id: string) {
     const chat = chats.find((c) => c.id === id);
     setRenameTarget({ id, title: chat?.title || "" });
@@ -701,6 +718,7 @@ export default function ChatInterface() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChatId]);
   const profilePicture = getProfilePicture();
+  const userEmail = getTokenPayload()?.sub ?? null;
   const threadSuggestions = getSuggestions(activeAdvisorId);
   const activeQueue = activeChatId ? queues[activeChatId] || [] : [];
   return (
@@ -836,7 +854,13 @@ export default function ChatInterface() {
           onBulkDelete={handleBulkDelete}
           onShare={handleShare}
           onRename={handleRename}
+          onPin={handlePin}
           onToggleSidebar={() => setSidebarOpen(false)}
+          userEmail={userEmail}
+          profilePicture={profilePicture}
+          isAdmin={isAdmin}
+          onAdminDashboard={() => (window.location.href = "/admin")}
+          onLogout={handleLogout}
         />
       )}
       <div className={`main-chat ${showEmptyState ? "main-chat--empty" : ""}`}>
@@ -855,19 +879,6 @@ export default function ChatInterface() {
             )}
             {showEmptyState && <h1>EIF AI Advisor</h1>}
           </div>
-          {isAuthenticated && (
-            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-              {isAdmin && (
-                <button
-                  className="logout-btn"
-                  onClick={() => window.location.href = '/admin'}
-                >
-                  Admin Dashboard
-                </button>
-              )}
-              <LogoutButton onLogout={handleLogout} />
-            </div>
-          )}
         </div>
         {chatsLoading ? (
           <ChatSkeleton />

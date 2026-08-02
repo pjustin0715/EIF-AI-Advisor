@@ -256,6 +256,20 @@ body {
   padding: 4px 8px 8px 16px;
 }
 
+.chat-group + .chat-group {
+  margin-top: 12px;
+}
+
+.chat-group-title {
+  margin: 0;
+  padding: 4px 10px 4px 16px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
 .chat-item {
   padding: 8px 10px 8px 16px;
   border-radius: 8px;
@@ -316,6 +330,57 @@ body {
 
 .chat-item--skeleton.active {
   background: var(--item-active);
+}
+
+.sidebar-footer {
+  border-top: 1px solid var(--sidebar-border);
+  padding: 8px;
+  flex-shrink: 0;
+}
+
+.sidebar-profile-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-main);
+  font-family: inherit;
+}
+
+.sidebar-profile-btn:hover {
+  background: var(--item-hover);
+}
+
+.sidebar-profile-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--item-hover);
+  color: var(--text-muted);
+  overflow: hidden;
+}
+
+.sidebar-profile-avatar .avatar-img {
+  border-radius: 999px;
+}
+
+.sidebar-profile-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .input-area--skeleton {
@@ -1516,7 +1581,7 @@ body {
   background: transparent;
 }
 
-.empty-input-area button {
+.empty-input-area .send-btn {
   background: var(--primary);
   color: white;
   border: none;
@@ -1530,15 +1595,29 @@ body {
   flex-shrink: 0;
 }
 
-.empty-input-area button:disabled {
+.empty-input-area .send-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.empty-input-area button svg {
+.empty-input-area .send-btn svg {
   width: 18px;
   height: 18px;
   fill: currentColor;
+}
+
+.empty-input-area .mic-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+}
+
+.empty-input-area .mic-btn svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .suggestion-chips {

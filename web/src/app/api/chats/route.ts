@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
     .from("chats")
     .select("*")
     .eq("user_email", user.email)
+    .order("pinned", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (error) {

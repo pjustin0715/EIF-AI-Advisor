@@ -392,7 +392,7 @@ export default function RetrievalPanel({
       {finishedOpen && (
         <div className="retrieval-panel__body">
           <Timeline className="retrieval-timeline--finished">
-            {STEP_ORDER.map((step) => {
+            {STEP_ORDER.filter((step) => step === "ranking").map((step) => {
               const isExpanded = expandedStep === step;
               let label = STEP_LABELS[step];
               if (step === "ranking" && count > 0) {
