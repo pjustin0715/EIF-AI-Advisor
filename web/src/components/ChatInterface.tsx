@@ -57,6 +57,8 @@ import ContextMeter from "./ContextMeter";
 import LoginOverlay, { LogoutButton } from "./LoginOverlay";
 import NewChatModal from "./NewChatModal";
 import RetrievalPanel from "./RetrievalPanel";
+import ChatMessagesSkeleton from "./ChatMessagesSkeleton";
+import ChatSkeleton from "./ChatSkeleton";
 import Sidebar from "./Sidebar";
 import SuggestionChips from "./SuggestionChips";
 import SpeechMicButton from "./SpeechMicButton";
@@ -382,19 +384,9 @@ export default function ChatInterface() {
       setSelectedIds(new Set(chats.map((c) => c.id)));
     }
   }
-  async function deleteChats(ids: string[]) {
-    if (ids.length === 1) {
-      await fetch(`/api/chats/${ids[0]}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
-    } else {
-      await fetch("/api/chats/batch", {
-        method: "DELETE",
-        headers: authHeaders(),
-        body: JSON.stringify({ ids }),
-      });
-    }
+  function deleteChats(ids: string[]) {
+    // Optimistic update: remove from UI immediately
+    setChats((prev) => prev.filter((c) => !ids.includes(c.id)));
     clearDrafts(ids);
     {
       const next = { ...queuesRef.current };
@@ -413,7 +405,27 @@ export default function ChatInterface() {
     }
     setSelectMode(false);
     setSelectedIds(new Set());
-    loadChats();
+
+    // Send deletion to backend asynchronously (don't wait for response)
+    (async () => {
+      try {
+        if (ids.length === 1) {
+          await fetch(`/api/chats/${ids[0]}`, {
+            method: "DELETE",
+            headers: authHeaders(),
+          });
+        } else {
+          await fetch("/api/chats/batch", {
+            method: "DELETE",
+            headers: authHeaders(),
+            body: JSON.stringify({ ids }),
+          });
+        }
+      } catch (err) {
+        // Silently fail - deletion already removed from UI
+        console.error("Failed to delete chats:", err);
+      }
+    })();
   }
   function handleDeleteChat(id: string) {
     setPendingDelete({ type: "single", ids: [id] });
@@ -800,6 +812,7 @@ export default function ChatInterface() {
       {isAuthenticated && sidebarOpen && (
         <Sidebar
           chats={chats}
+          loading={chatsLoading}
           activeChatId={activeChatId}
           selectMode={selectMode}
           selectedIds={selectedIds}
@@ -848,14 +861,8 @@ export default function ChatInterface() {
             </div>
           )}
         </div>
-        {(chatsLoading || messagesLoading) ? (
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div className="loading">
-              <div className="dot" />
-              <div className="dot" />
-              <div className="dot" />
-            </div>
-          </div>
+        {chatsLoading ? (
+          <ChatSkeleton />
         ) : showEmptyState ? (
           <EmptyChatState
             input={input}
@@ -875,6 +882,8 @@ export default function ChatInterface() {
               <div className="chat-messages-inner">
                 {!isAuthenticated ? null : !activeChatId ? (
                   <div className="empty-chat">Select or create a chat to begin.</div>
+                ) : messagesLoading ? (
+                  <ChatMessagesSkeleton />
                 ) : (
                   <>
                     <div className="thread-welcome">
@@ -1107,7 +1116,7 @@ export default function ChatInterface() {
                     loading ? "Queue a follow-up or steer..." : "Message..."
                   }
                   value={input}
-                  disabled={!isAuthenticated || !activeChatId}
+                  disabled={!isAuthenticated || !activeChatId || messagesLoading}
                   onChange={(e) => handleInputChange(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
@@ -1145,7 +1154,7 @@ export default function ChatInterface() {
                 <SpeechMicButton
                   listening={speechListening}
                   onClick={toggleSpeech}
-                  disabled={!isAuthenticated || !activeChatId}
+                  disabled={!isAuthenticated || !activeChatId || messagesLoading}
                 />
                 {loading ? (
                   <>
@@ -1183,7 +1192,7 @@ export default function ChatInterface() {
                 ) : (
                   <button
                     className="send-btn"
-                    disabled={!isAuthenticated || !activeChatId || !input.trim()}
+                    disabled={!isAuthenticated || !activeChatId || !input.trim() || messagesLoading}
                     onClick={() => sendMessage()}
                     type="button"
                   >

@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import SidebarChatSkeleton from "./SidebarChatSkeleton";
 
 interface Chat {
   id: string;
@@ -25,6 +26,7 @@ interface Chat {
 
 interface Props {
   chats: Chat[];
+  loading?: boolean;
   activeChatId: string | null;
   selectMode: boolean;
   selectedIds: Set<string>;
@@ -42,6 +44,7 @@ interface Props {
 
 export default function Sidebar({
   chats,
+  loading = false,
   activeChatId,
   selectMode,
   selectedIds,
@@ -120,7 +123,9 @@ export default function Sidebar({
       </div>
 
       <div className="chat-list">
-        {chats.length === 0 ? (
+        {loading ? (
+          <SidebarChatSkeleton />
+        ) : chats.length === 0 ? (
           <p className="sidebar-empty">No chats yet</p>
         ) : (
           chats.map((chat) => {
@@ -172,22 +177,44 @@ export default function Sidebar({
                           <MoreVertical className="h-4 w-4" />
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" side="right" sideOffset={8}>
-                        <DropdownMenuItem onSelect={() => onShare(chat.id)}>
+                      <DropdownMenuContent
+                        align="start"
+                        side="right"
+                        sideOffset={8}
+                        onKeyDown={(e) => {
+                          const key = e.key.toLowerCase();
+                          if (key !== "s" && key !== "r" && key !== "d") return;
+                          e.preventDefault();
+                          e.currentTarget
+                            .querySelector<HTMLElement>(`[data-shortcut="${key}"]`)
+                            ?.click();
+                        }}
+                      >
+                        <DropdownMenuItem
+                          data-shortcut="s"
+                          onSelect={() => onShare(chat.id)}
+                        >
                           <Share2 className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
                           Share
+                          <span className="dropdown-menu-shortcut">S</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => onRename(chat.id)}>
+                        <DropdownMenuItem
+                          data-shortcut="r"
+                          onSelect={() => onRename(chat.id)}
+                        >
                           <Pencil className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
                           Rename
+                          <span className="dropdown-menu-shortcut">R</span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
+                          data-shortcut="d"
                           variant="destructive"
                           onSelect={() => onDelete(chat.id)}
                         >
                           <Trash2 className="h-4 w-4 shrink-0" />
                           Delete
+                          <span className="dropdown-menu-shortcut">D</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

@@ -308,6 +308,26 @@ body {
   color: var(--text-secondary);
 }
 
+.chat-item--skeleton {
+  pointer-events: none;
+  cursor: default;
+}
+
+.chat-item--skeleton.active {
+  background: var(--item-active);
+}
+
+.input-area--skeleton {
+  pointer-events: none;
+  border-color: transparent;
+  background: transparent;
+  padding: 0;
+}
+
+.chat-messages-skeleton {
+  width: 100%;
+}
+
 .chat-options-container {
   display: flex;
   align-items: center;
@@ -374,6 +394,14 @@ body {
 .dropdown-menu-item[data-highlighted],
 .dropdown-menu-item:focus {
   background: var(--item-hover);
+}
+
+.dropdown-menu-shortcut {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
 }
 
 .dropdown-menu-item[data-disabled] {
