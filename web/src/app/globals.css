@@ -1651,3 +1651,8 @@ body {
 .confirm-dialog {
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
 }
+
+[role="alertdialog"] button {
+  box-shadow: none !important;
+  border-style: solid;
+}
