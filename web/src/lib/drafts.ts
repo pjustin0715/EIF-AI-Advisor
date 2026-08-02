@@ -72,3 +72,10 @@ export const DEFAULT_CHAT_TITLES = new Set(["new chat", "untitled", ""]);
 export function isDefaultChatTitle(title: string | null | undefined): boolean {
   return DEFAULT_CHAT_TITLES.has((title || "").trim().toLowerCase());
 }
+
+/** Short sidebar title derived from the first user prompt. */
+export function titleFromPrompt(message: string): string {
+  const words = message.trim().split(/\s+/).slice(0, 6).join(" ");
+  if (!words) return "New Chat";
+  return words.length > 40 ? `${words.slice(0, 40)}…` : words;
+}

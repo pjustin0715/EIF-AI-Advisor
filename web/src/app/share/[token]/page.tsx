@@ -104,6 +104,20 @@ export default function SharedChatPage({ params }: { params: { token: string } }
                     {msg.role === "user" ? "U" : "AI"}
                   </div>
                   <div className="message-content">
+                    {msg.role !== "user" && (
+                      <RetrievalPanel
+                        mode="finished"
+                        retrieval={normalizeCitations(msg.citations)}
+                        isAdmin={isAdmin}
+                        query={
+                          messages
+                            .slice(0, idx)
+                            .reverse()
+                            .find((m: { role?: string }) => m.role === "user")
+                            ?.content || null
+                        }
+                      />
+                    )}
                     <div
                       dangerouslySetInnerHTML={{
                         __html: marked.parse(
@@ -112,23 +126,9 @@ export default function SharedChatPage({ params }: { params: { token: string } }
                       }}
                     />
                     {msg.role !== "user" && (
-                      <>
-                        <RetrievalPanel
-                          mode="finished"
-                          retrieval={normalizeCitations(msg.citations)}
-                          isAdmin={isAdmin}
-                          query={
-                            messages
-                              .slice(0, idx)
-                              .reverse()
-                              .find((m: { role?: string }) => m.role === "user")
-                              ?.content || null
-                          }
-                        />
-                        <CopyMessageButton
-                          text={extractNextQuestion(msg.content || "").body}
-                        />
-                      </>
+                      <CopyMessageButton
+                        text={extractNextQuestion(msg.content || "").body}
+                      />
                     )}
                   </div>
                 </div>
