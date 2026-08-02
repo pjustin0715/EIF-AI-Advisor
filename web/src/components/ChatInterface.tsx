@@ -897,7 +897,13 @@ export default function ChatInterface() {
                   <>
                     <div className="thread-welcome">
                       <div className="message message--ai">
-                        <div className="avatar ai">AI</div>
+                        <div className="avatar ai">
+                          <img
+                            src="/eskwelabs-logo.png"
+                            alt="Eskwelabs AI"
+                            className="avatar-img"
+                          />
+                        </div>
                         <div className="message-content">
                           <p>{ADVISOR_GREETINGS[activeAdvisorId] || "Hi! How can I assist you today?"}</p>
                           {messages.length === 0 && (
@@ -934,7 +940,11 @@ export default function ChatInterface() {
                                 "U"
                               )
                             ) : (
-                              "AI"
+                              <img
+                                src="/eskwelabs-logo.png"
+                                alt="Eskwelabs AI"
+                                className="avatar-img"
+                              />
                             )}
                           </div>
                           <div className="message-content">
@@ -986,7 +996,13 @@ export default function ChatInterface() {
                 )}
                 {loading && (
                   <div className="message message--ai">
-                    <div className="avatar ai">AI</div>
+                    <div className="avatar ai">
+                      <img
+                        src="/eskwelabs-logo.png"
+                        alt="Eskwelabs AI"
+                        className="avatar-img"
+                      />
+                    </div>
                     <div className="message-content message-content--loading">
                       {streamingText ? (
                         <>

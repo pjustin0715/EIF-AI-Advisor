@@ -101,7 +101,15 @@ export default function SharedChatPage({ params }: { params: { token: string } }
               messages.map((msg: any, idx: number) => (
                 <div key={idx} className={`message ${msg.role === "user" ? "message--user" : "message--ai"}`}>
                   <div className={`avatar ${msg.role === "user" ? "user" : "ai"}`}>
-                    {msg.role === "user" ? "U" : "AI"}
+                    {msg.role === "user" ? (
+                      "U"
+                    ) : (
+                      <img
+                        src="/eskwelabs-logo.png"
+                        alt="Eskwelabs AI"
+                        className="avatar-img"
+                      />
+                    )}
                   </div>
                   <div className="message-content">
                     {msg.role !== "user" && (

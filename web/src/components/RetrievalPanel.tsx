@@ -374,10 +374,7 @@ export default function RetrievalPanel({
   }
 
   const count = retrieval?.sources.length ?? 0;
-  const summary =
-    count > 0
-      ? `How this was grounded (${count})`
-      : "How this was grounded";
+  const summary = count > 0 ? `Sources (${count})` : "Sources";
 
   return (
     <div
