@@ -1,6 +1,13 @@
 import { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import {
+  contextUsageFromPrompt,
+  filterHistoryForPrompt,
+  maybeCompactHistory,
+  toOpenAIMessages,
+  type HistoryMessage,
+} from "@/lib/context-window";
+import {
   estimateCost,
   estimateTokens,
   getOpenRouterClient,
@@ -10,8 +17,6 @@ import { isDefaultChatTitle } from "@/lib/drafts";
 import { generateChatTitle } from "@/lib/generate-title";
 import { buildSystemPrompt, retrieveContext } from "@/lib/rag-client";
 import { getSupabaseAdmin } from "@/lib/supabase";
-
-const MAX_HISTORY_MESSAGES = 40;
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req);
@@ -57,7 +62,7 @@ export async function POST(req: NextRequest) {
     .eq("chat_id", chat_id)
     .order("created_at", { ascending: true });
 
-  const history = (historyRows || []).slice(-MAX_HISTORY_MESSAGES);
+  const history = (historyRows || []) as HistoryMessage[];
   const isFirstMessage =
     history.length === 1 && history[0]?.role === "user";
   const shouldAutoTitle =
@@ -67,7 +72,8 @@ export async function POST(req: NextRequest) {
   try {
     ragContext = await retrieveContext(prompt, chat.advisor_id || "advisor1");
   } catch (err) {
-    const message = err instanceof Error ? err.message : "RAG service unavailable";
+    const message =
+      err instanceof Error ? err.message : "RAG service unavailable";
     await supabase.from("turn_logs").insert({
       conversation_id: chat_id,
       user_email: userEmail,
@@ -85,29 +91,66 @@ export async function POST(req: NextRequest) {
   const docUrl = ragContext.doc_url ?? null;
   const retrievedChunkIds = ragContext.retrieved_chunk_ids;
 
-  const openAIHistory: any[] = history.map((m) => ({
-    role: m.role === "user" ? "user" : "assistant",
-    content: m.content,
-  }));
+  let contextSummary = (chat.context_summary as string | null) || null;
+  let compactedThroughAt =
+    (chat.compacted_through_at as string | null) || null;
+  let didCompact = false;
+  let promptHistory = filterHistoryForPrompt(history, compactedThroughAt);
+
+  try {
+    const compactResult = await maybeCompactHistory({
+      systemPrompt,
+      history,
+      existingSummary: contextSummary,
+      compactedThroughAt,
+    });
+
+    promptHistory = compactResult.keptHistory;
+    if (compactResult.compacted) {
+      didCompact = true;
+      contextSummary = compactResult.summary;
+      compactedThroughAt = compactResult.compactedThroughAt;
+      await supabase
+        .from("chats")
+        .update({
+          context_summary: contextSummary,
+          compacted_through_at: compactedThroughAt,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", chat_id);
+    } else if (compactResult.summary) {
+      contextSummary = compactResult.summary;
+    }
+  } catch (err) {
+    console.error("Auto-compact failed, using filtered history:", err);
+    promptHistory = filterHistoryForPrompt(history, compactedThroughAt).slice(
+      -40
+    );
+  }
+
+  const openAIHistory = toOpenAIMessages(promptHistory, contextSummary);
+  const contextUsage = contextUsageFromPrompt({
+    systemPrompt,
+    history: promptHistory,
+    summary: contextSummary,
+    compacted: didCompact,
+  });
 
   const openai = getOpenRouterClient();
-  const promptTokenEstimate = estimateTokens(
-    systemPrompt + history.map((m) => m.content).join("")
-  );
+  const promptTokenEstimate = contextUsage.used;
 
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
       let fullText = "";
       let completionTokens = 0;
-      // Fetch the active model for this advisor, fallback to default MODEL
       const { data: advisorModel } = await supabase
         .from("advisor_models")
         .select("model_name")
         .eq("advisor_id", chat.advisor_id)
         .eq("is_active", true)
         .maybeSingle();
-      
+
       const targetModel = advisorModel?.model_name || MODEL;
       let actualModelUsed = targetModel;
 
@@ -124,6 +167,7 @@ export async function POST(req: NextRequest) {
 
       try {
         send({ type: "citations", citations, doc_url: docUrl });
+        send({ type: "context", ...contextUsage });
 
         const response = await openai.chat.completions.create({
           model: targetModel,
@@ -160,6 +204,14 @@ export async function POST(req: NextRequest) {
           completionTokens
         );
 
+        const postUsage = contextUsageFromPrompt({
+          systemPrompt,
+          history: [...promptHistory, { role: "model", content: fullText }],
+          summary: contextSummary,
+          compacted: didCompact,
+        });
+        send({ type: "context", ...postUsage });
+
         await supabase.from("turn_logs").insert({
           conversation_id: chat_id,
           user_email: userEmail,
@@ -179,7 +231,7 @@ export async function POST(req: NextRequest) {
             .from("chats")
             .update({ title: newTitle, updated_at: new Date().toISOString() })
             .eq("id", chat_id);
-          
+
           if (updateError) {
             console.error("Failed to update chat title:", updateError);
           } else {

@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  buildContextUsage,
+  estimatePromptTokens,
+  filterHistoryForPrompt,
+  usableContextTokens,
+  type HistoryMessage,
+} from "@/lib/context-window";
 import { getSupabaseAdmin } from "@/lib/supabase";
+
+/** Approximate system + RAG overhead when no live system prompt is available. */
+const SYSTEM_OVERHEAD_TOKENS = 2500;
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +41,28 @@ export async function GET(
     .eq("chat_id", params.id)
     .order("created_at", { ascending: true });
 
-  return NextResponse.json({ chat, messages: messages || [] });
+  const history = (messages || []) as HistoryMessage[];
+  const promptHistory = filterHistoryForPrompt(
+    history,
+    chat.compacted_through_at as string | null
+  );
+  const used =
+    estimatePromptTokens(
+      "",
+      promptHistory,
+      chat.context_summary as string | null
+    ) + SYSTEM_OVERHEAD_TOKENS;
+  const context_usage = buildContextUsage(
+    used,
+    usableContextTokens(),
+    Boolean(chat.context_summary)
+  );
+
+  return NextResponse.json({
+    chat,
+    messages: messages || [],
+    context_usage,
+  });
 }
 
 export async function DELETE(
