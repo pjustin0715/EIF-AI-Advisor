@@ -653,43 +653,77 @@ body {
 }
 
 .context-meter {
-  width: 100%;
-  max-width: 768px;
+  position: relative;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 4px;
-  font-size: 0.75rem;
-  color: var(--text-muted);
   user-select: none;
 }
 
-.context-meter-track {
-  flex: 1;
-  height: 4px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--input-border) 80%, transparent);
-  overflow: hidden;
-  min-width: 64px;
+.context-meter-ring-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease;
 }
 
-.context-meter-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: var(--primary);
-  transition: width 0.25s ease;
+.context-meter-ring-btn:hover {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
-.context-meter--ok .context-meter-fill {
-  background: var(--primary);
+.context-meter--open .context-meter-ring-btn {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
-.context-meter--warn .context-meter-fill {
-  background: #d97706;
+.context-meter-ring {
+  display: block;
 }
 
-.context-meter--critical .context-meter-fill {
-  background: #ea384c;
+.context-meter-ring-track {
+  stroke: color-mix(in srgb, var(--input-border) 80%, transparent);
+}
+
+.context-meter-ring-fill {
+  stroke: var(--primary);
+  transition: stroke-dashoffset 0.25s ease, stroke 0.15s ease;
+}
+
+.context-meter--ok .context-meter-ring-fill {
+  stroke: var(--primary);
+}
+
+.context-meter--warn .context-meter-ring-fill {
+  stroke: #d97706;
+}
+
+.context-meter--critical .context-meter-ring-fill {
+  stroke: #ea384c;
+}
+
+.context-meter-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  background: var(--input-bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .context-meter-label {
@@ -741,9 +775,10 @@ body {
   border: none;
   outline: none;
   font-size: 1.05rem;
+  min-width: 0;
 }
 
-.input-area button {
+.input-area .send-btn {
   background: var(--primary);
   color: white;
   border: none;
@@ -754,9 +789,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
-.input-area button:disabled {
+.input-area .send-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -769,7 +805,7 @@ body {
   fill: white;
 }
 
-.input-area button svg {
+.input-area .send-btn svg {
   width: 16px;
   height: 16px;
   fill: currentColor;

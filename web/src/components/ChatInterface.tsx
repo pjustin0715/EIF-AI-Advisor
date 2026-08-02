@@ -689,14 +689,43 @@ export default function ChatInterface() {
                   onChange={(e) => handleInputChange(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
                 />
+                {activeChatId && (
+                  <ContextMeter
+                    usage={(() => {
+                      const draftTokens = Math.ceil(input.length / 4);
+                      if (contextUsage) {
+                        return buildContextUsage(
+                          contextUsage.used + draftTokens,
+                          contextUsage.limit,
+                          contextUsage.compacted
+                        );
+                      }
+                      return buildContextUsage(
+                        estimateConversationTokensClient(
+                          messages,
+                          input,
+                          contextSummary
+                        ),
+                        usableContextTokens(),
+                        Boolean(contextSummary)
+                      );
+                    })()}
+                    compacting={compacting}
+                    canCompact={
+                      !loading && !compacting && messages.length > 10
+                    }
+                    onCompact={handleManualCompact}
+                  />
+                )}
                 {loading ? (
-                  <button onClick={stopStreaming} type="button" className="stop-btn">
+                  <button onClick={stopStreaming} type="button" className="send-btn stop-btn">
                     <svg viewBox="0 0 24 24">
                       <rect x="6" y="6" width="12" height="12" />
                     </svg>
                   </button>
                 ) : (
                   <button
+                    className="send-btn"
                     disabled={!isAuthenticated || !activeChatId || !input.trim()}
                     onClick={() => sendMessage()}
                     type="button"
@@ -707,34 +736,6 @@ export default function ChatInterface() {
                   </button>
                 )}
               </div>
-              {activeChatId && (
-                <ContextMeter
-                  usage={(() => {
-                    const draftTokens = Math.ceil(input.length / 4);
-                    if (contextUsage) {
-                      return buildContextUsage(
-                        contextUsage.used + draftTokens,
-                        contextUsage.limit,
-                        contextUsage.compacted
-                      );
-                    }
-                    return buildContextUsage(
-                      estimateConversationTokensClient(
-                        messages,
-                        input,
-                        contextSummary
-                      ),
-                      usableContextTokens(),
-                      Boolean(contextSummary)
-                    );
-                  })()}
-                  compacting={compacting}
-                  canCompact={
-                    !loading && !compacting && messages.length > 10
-                  }
-                  onCompact={handleManualCompact}
-                />
-              )}
             </div>
           </>
         )}

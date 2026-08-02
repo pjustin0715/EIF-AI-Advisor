@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useId, useRef, useState } from "react";
 import {
   DEFAULT_CONTEXT_WINDOW_TOKENS,
   DEFAULT_OUTPUT_RESERVE_TOKENS,
@@ -15,6 +16,9 @@ type Props = {
   onCompact?: () => void;
 };
 
+const RING_SIZE = 22;
+const RING_STROKE = 2.5;
+
 function levelClass(percent: number): string {
   if (percent >= 90) return "context-meter--critical";
   if (percent >= 75) return "context-meter--warn";
@@ -27,6 +31,10 @@ export default function ContextMeter({
   canCompact,
   onCompact,
 }: Props) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
+
   const limit =
     usage?.limit ||
     usableContextTokens(
@@ -37,38 +45,105 @@ export default function ContextMeter({
   const percent = usage?.percent ?? 0;
   const compacted = usage?.compacted ?? false;
 
+  const radius = (RING_SIZE - RING_STROKE) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset =
+    circumference - (Math.min(100, Math.max(0, percent)) / 100) * circumference;
+
+  useEffect(() => {
+    if (!open) return;
+
+    function onPointerDown(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   return (
     <div
-      className={`context-meter ${levelClass(percent)}`}
-      title={`Context window: ${used.toLocaleString()} / ${limit.toLocaleString()} tokens${
-        compacted ? " (compacted)" : ""
-      }`}
-      aria-label={`Context window ${percent}% full`}
+      ref={rootRef}
+      className={`context-meter ${levelClass(percent)}${open ? " context-meter--open" : ""}`}
     >
-      <div className="context-meter-track" aria-hidden="true">
-        <div
-          className="context-meter-fill"
-          style={{ width: `${Math.min(100, percent)}%` }}
-        />
-      </div>
-      <span className="context-meter-label">
-        {compacting
-          ? "Compacting…"
-          : `${formatTokenCount(used)} / ${formatTokenCount(limit)}`}
-        {compacted && !compacting ? (
-          <span className="context-meter-badge">compacted</span>
-        ) : null}
-      </span>
-      {onCompact ? (
-        <button
-          type="button"
-          className="context-meter-compact-btn"
-          onClick={onCompact}
-          disabled={!canCompact || compacting}
-          title="Summarize older turns to free context"
+      <button
+        type="button"
+        className="context-meter-ring-btn"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={`Context window ${percent}% full. ${
+          open ? "Hide" : "Show"
+        } details`}
+        title={`Context ${formatTokenCount(used)} / ${formatTokenCount(limit)}`}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <svg
+          className="context-meter-ring"
+          width={RING_SIZE}
+          height={RING_SIZE}
+          viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
+          aria-hidden="true"
         >
-          Compact
-        </button>
+          <circle
+            className="context-meter-ring-track"
+            cx={RING_SIZE / 2}
+            cy={RING_SIZE / 2}
+            r={radius}
+            fill="none"
+            strokeWidth={RING_STROKE}
+          />
+          <circle
+            className="context-meter-ring-fill"
+            cx={RING_SIZE / 2}
+            cy={RING_SIZE / 2}
+            r={radius}
+            fill="none"
+            strokeWidth={RING_STROKE}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
+          />
+        </svg>
+      </button>
+
+      {open ? (
+        <div
+          id={panelId}
+          className="context-meter-panel"
+          role="dialog"
+          aria-label="Context window details"
+        >
+          <span className="context-meter-label">
+            {compacting
+              ? "Compacting…"
+              : `${formatTokenCount(used)} / ${formatTokenCount(limit)}`}
+            {compacted && !compacting ? (
+              <span className="context-meter-badge">compacted</span>
+            ) : null}
+          </span>
+          {onCompact ? (
+            <button
+              type="button"
+              className="context-meter-compact-btn"
+              onClick={onCompact}
+              disabled={!canCompact || compacting}
+              title="Summarize older turns to free context"
+            >
+              Compact
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
