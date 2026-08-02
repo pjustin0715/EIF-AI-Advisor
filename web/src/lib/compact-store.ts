@@ -1,55 +1,47 @@
 import {
-  CONTEXT_SUMMARY_CITATION,
-  type HistoryMessage,
+  conversationMessages,
   readCompactState,
+  type HistoryMessage,
 } from "@/lib/context-window";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/**
- * Persist compact summary as a special messages row.
- * Avoids requiring chats.context_summary columns (DDL not available via service role).
- */
+export type CompactState = {
+  summary: string | null;
+  compactedThroughAt: string | null;
+};
+
+/** Prefer chats columns; fall back to legacy summary message rows if present. */
+export function resolveCompactState(
+  chat: {
+    context_summary?: string | null;
+    compacted_through_at?: string | null;
+  },
+  history: HistoryMessage[]
+): CompactState {
+  if (chat.context_summary) {
+    return {
+      summary: chat.context_summary,
+      compactedThroughAt: chat.compacted_through_at ?? null,
+    };
+  }
+  return readCompactState(history);
+}
+
 export async function saveCompactSummary(
   supabase: SupabaseClient,
   chatId: string,
   summary: string,
   compactedThroughAt: string
 ): Promise<{ error: string | null }> {
-  // Remove prior summary rows so only the latest applies
-  const { data: existing } = await supabase
-    .from("messages")
-    .select("id, citations")
-    .eq("chat_id", chatId);
-
-  const staleIds = (existing || [])
-    .filter((m) => {
-      const c = m.citations;
-      return (
-        !!c &&
-        typeof c === "object" &&
-        !Array.isArray(c) &&
-        (c as { type?: string }).type === CONTEXT_SUMMARY_CITATION.type
-      );
-    })
-    .map((m) => m.id as string);
-
-  if (staleIds.length) {
-    await supabase.from("messages").delete().in("id", staleIds);
-  }
-
-  const { error } = await supabase.from("messages").insert({
-    chat_id: chatId,
-    role: "model",
-    content: summary,
-    citations: {
-      ...CONTEXT_SUMMARY_CITATION,
+  const { error } = await supabase
+    .from("chats")
+    .update({
+      context_summary: summary,
       compacted_through_at: compactedThroughAt,
-    },
-  });
+    })
+    .eq("id", chatId);
 
   return { error: error?.message ?? null };
 }
 
-export function compactStateFromHistory(history: HistoryMessage[]) {
-  return readCompactState(history);
-}
+export { conversationMessages };

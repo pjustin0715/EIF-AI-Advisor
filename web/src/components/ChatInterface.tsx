@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PanelLeft } from "lucide-react";
 import { marked } from "marked";
 import {
   authHeaders,
@@ -30,9 +31,28 @@ import {
   type RetrievalPayload,
   type RetrievalStatusStep,
 } from "@/lib/retrieval";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import CopyMessageButton from "./CopyMessageButton";
 import EmptyChatState from "./EmptyChatState";
-import ConfirmDialog from "./ConfirmDialog";
 import ContextMeter from "./ContextMeter";
 import LoginOverlay, { LogoutButton } from "./LoginOverlay";
 import NewChatModal from "./NewChatModal";
@@ -95,8 +115,11 @@ export default function ChatInterface() {
   const [editingQueueId, setEditingQueueId] = useState<string | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [renameTarget, setRenameTarget] = useState<{ id: string; title: string } | null>(null);
+  const [renameValue, setRenameValue] = useState("");
   const [contextUsage, setContextUsage] = useState<ContextUsage | null>(null);
   const [contextSummary, setContextSummary] = useState<string | null>(null);
   const [compacting, setCompacting] = useState(false);
@@ -116,14 +139,9 @@ export default function ChatInterface() {
     setLoading(value);
   }
 
-  function syncQueues(
-    updater: (prev: Record<string, QueuedPrompt[]>) => Record<string, QueuedPrompt[]>
-  ) {
-    setQueues((prev) => {
-      const next = updater(prev);
-      queuesRef.current = next;
-      return next;
-    });
+  function setQueuesSync(next: Record<string, QueuedPrompt[]>) {
+    queuesRef.current = next;
+    setQueues(next);
   }
 
   function enqueuePrompt(chatId: string, text: string) {
@@ -134,14 +152,14 @@ export default function ChatInterface() {
           : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       text,
     };
-    syncQueues((prev) => ({
-      ...prev,
-      [chatId]: [...(prev[chatId] || []), item],
-    }));
+    setQueuesSync({
+      ...queuesRef.current,
+      [chatId]: [...(queuesRef.current[chatId] || []), item],
+    });
   }
 
   function clearChatQueue(chatId: string) {
-    syncQueues((prev) => ({ ...prev, [chatId]: [] }));
+    setQueuesSync({ ...queuesRef.current, [chatId]: [] });
     setEditingQueueId(null);
   }
 
@@ -149,17 +167,17 @@ export default function ChatInterface() {
     const list = queuesRef.current[chatId] || [];
     if (list.length === 0) return null;
     const [head, ...rest] = list;
-    const next = { ...queuesRef.current, [chatId]: rest };
-    queuesRef.current = next;
-    setQueues(next);
+    setQueuesSync({ ...queuesRef.current, [chatId]: rest });
     return head.text;
   }
 
   function removeQueueItem(chatId: string, id: string) {
-    syncQueues((prev) => ({
-      ...prev,
-      [chatId]: (prev[chatId] || []).filter((item) => item.id !== id),
-    }));
+    setQueuesSync({
+      ...queuesRef.current,
+      [chatId]: (queuesRef.current[chatId] || []).filter(
+        (item) => item.id !== id
+      ),
+    });
     setEditingQueueId((current) => (current === id ? null : current));
   }
 
@@ -169,12 +187,12 @@ export default function ChatInterface() {
       removeQueueItem(chatId, id);
       return;
     }
-    syncQueues((prev) => ({
-      ...prev,
-      [chatId]: (prev[chatId] || []).map((item) =>
+    setQueuesSync({
+      ...queuesRef.current,
+      [chatId]: (queuesRef.current[chatId] || []).map((item) =>
         item.id === id ? { ...item, text: trimmed } : item
       ),
-    }));
+    });
   }
 
   function discardPartialStream() {
@@ -294,8 +312,7 @@ export default function ChatInterface() {
     setContextSummary(null);
     setSelectMode(false);
     setSelectedIds(new Set());
-    setQueues({});
-    queuesRef.current = {};
+    setQueuesSync({});
     setEditingQueueId(null);
     setLoadingFlag(false);
     discardPartialStream();
@@ -370,11 +387,11 @@ export default function ChatInterface() {
       });
     }
     clearDrafts(ids);
-    syncQueues((prev) => {
-      const next = { ...prev };
+    {
+      const next = { ...queuesRef.current };
       for (const id of ids) delete next[id];
-      return next;
-    });
+      setQueuesSync(next);
+    }
     if (activeChatId && ids.includes(activeChatId)) {
       if (streamingChatIdRef.current === activeChatId) {
         abortRef.current?.abort();
@@ -415,10 +432,23 @@ export default function ChatInterface() {
       setShareUrl(url);
     }
   }
-  async function handleRename(id: string) {
-    const newTitle = prompt("Enter new chat name:");
+  function handleRename(id: string) {
+    const chat = chats.find((c) => c.id === id);
+    setRenameTarget({ id, title: chat?.title || "" });
+    setRenameValue(chat?.title || "");
+  }
+
+  async function confirmRename() {
+    if (!renameTarget) return;
+    const newTitle = renameValue.trim();
     if (!newTitle) return;
-    const res = await fetch(`/api/chats/${id}`, { method: "PATCH", headers: authHeaders(), body: JSON.stringify({ title: newTitle }) });
+    const { id } = renameTarget;
+    setRenameTarget(null);
+    const res = await fetch(`/api/chats/${id}`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: newTitle }),
+    });
     if (res.ok) updateChatTitle(id, newTitle);
   }
   function stopStreaming() {
@@ -426,17 +456,33 @@ export default function ChatInterface() {
     abortRef.current?.abort();
   }
 
+  function steerWithText(chatId: string, text: string) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    clearChatQueue(chatId);
+    if (loadingRef.current) {
+      enqueuePrompt(chatId, trimmed);
+      discardPartialStream();
+      abortRef.current?.abort();
+      return;
+    }
+    void startTurn(chatId, trimmed, { clearInput: false });
+  }
+
   function steerMessage() {
     const text = input.trim();
     if (!text || !loadingRef.current) return;
     const chatId = streamingChatIdRef.current || activeChatId;
     if (!chatId) return;
-    clearChatQueue(chatId);
-    enqueuePrompt(chatId, text);
     setInput("");
     clearDraft(chatId);
-    discardPartialStream();
-    abortRef.current?.abort();
+    steerWithText(chatId, text);
+  }
+
+  function steerQueuedPrompt(chatId: string, id: string) {
+    const item = (queuesRef.current[chatId] || []).find((q) => q.id === id);
+    if (!item) return;
+    steerWithText(chatId, item.text);
   }
 
   async function createChat(advisorId: string): Promise<string | null> {
@@ -650,29 +696,97 @@ export default function ChatInterface() {
           setActiveChatId(id);
         }}
       />
-      <ConfirmDialog
+      <AlertDialog
         open={pendingDelete !== null}
-        title={pendingDelete?.type === "bulk" ? "Delete selected chats?" : "Delete chat?"}
-        message={
-          pendingDelete?.type === "bulk"
-            ? `This will permanently delete ${pendingDelete.ids.length} selected chat${pendingDelete.ids.length > 1 ? "s" : ""}.`
-            : "This chat and its messages will be permanently deleted."
-        }
-        confirmLabel="Delete"
-        onCancel={() => setPendingDelete(null)}
-        onConfirm={confirmDeleteChats}
-      />
-      <ConfirmDialog
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingDelete?.type === "bulk" ? "Delete selected chats?" : "Delete chat?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete?.type === "bulk"
+                ? `This will permanently delete ${pendingDelete.ids.length} selected chat${pendingDelete.ids.length > 1 ? "s" : ""}.`
+                : "This chat and its messages will be permanently deleted."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-[var(--error)] hover:bg-[#cf2d3f]"
+              onClick={confirmDeleteChats}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog
         open={shareUrl !== null}
-        title="Link Copied"
-        message="Your conversation snapshot link has been copied to your clipboard!"
-        confirmLabel="OK"
-        hideCancel={true}
-        confirmVariant="primary"
-        onCancel={() => setShareUrl(null)}
-        onConfirm={() => setShareUrl(null)}
-      />
-      {isAuthenticated && (
+        onOpenChange={(open) => {
+          if (!open) setShareUrl(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link copied</DialogTitle>
+            <DialogDescription>
+              Your conversation snapshot link has been copied to your clipboard.
+            </DialogDescription>
+          </DialogHeader>
+          {shareUrl && (
+            <Input readOnly value={shareUrl} onFocus={(e) => e.target.select()} />
+          )}
+          <DialogFooter>
+            <Button type="button" onClick={() => setShareUrl(null)}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={renameTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setRenameTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename chat</DialogTitle>
+            <DialogDescription>Enter a new name for this conversation.</DialogDescription>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void confirmRename();
+              }
+            }}
+            placeholder="Chat name"
+          />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setRenameTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void confirmRename()}
+              disabled={!renameValue.trim()}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {isAuthenticated && sidebarOpen && (
         <Sidebar
           chats={chats}
           activeChatId={activeChatId}
@@ -690,11 +804,23 @@ export default function ChatInterface() {
           onBulkDelete={handleBulkDelete}
           onShare={handleShare}
           onRename={handleRename}
+          onToggleSidebar={() => setSidebarOpen(false)}
         />
       )}
       <div className={`main-chat ${showEmptyState ? "main-chat--empty" : ""}`}>
         <div className="header">
           <div className="header-title">
+            {isAuthenticated && !sidebarOpen && (
+              <button
+                className="sidebar-toggle-btn"
+                onClick={() => setSidebarOpen(true)}
+                title="Show sidebar"
+                type="button"
+                aria-label="Show sidebar"
+              >
+                <PanelLeft className="h-4 w-4" />
+              </button>
+            )}
             <h1>{showEmptyState ? "EIF AI Advisor" : advisorName}</h1>
           </div>
           {isAuthenticated && (
@@ -780,6 +906,20 @@ export default function ChatInterface() {
                             )}
                           </div>
                           <div className="message-content">
+                            {msg.role !== "user" && (
+                              <RetrievalPanel
+                                mode="finished"
+                                retrieval={normalizeCitations(msg.citations)}
+                                isAdmin={isAdmin}
+                                query={
+                                  messages
+                                    .slice(0, idx)
+                                    .reverse()
+                                    .find((m) => m.role === "user")?.content ||
+                                  null
+                                }
+                              />
+                            )}
                             <div
                               dangerouslySetInnerHTML={{
                                 __html: marked.parse(
@@ -788,23 +928,9 @@ export default function ChatInterface() {
                               }}
                             />
                             {msg.role !== "user" && (
-                              <>
-                                <RetrievalPanel
-                                  mode="finished"
-                                  retrieval={normalizeCitations(msg.citations)}
-                                  isAdmin={isAdmin}
-                                  query={
-                                    messages
-                                      .slice(0, idx)
-                                      .reverse()
-                                      .find((m) => m.role === "user")?.content ||
-                                    null
-                                  }
-                                />
-                                <CopyMessageButton
-                                  text={extractNextQuestion(msg.content || "").body}
-                                />
-                              </>
+                              <CopyMessageButton
+                                text={extractNextQuestion(msg.content || "").body}
+                              />
                             )}
                             {isLatestAi && msg.suggestion && (
                               <SuggestionChips
@@ -830,13 +956,6 @@ export default function ChatInterface() {
                     <div className="message-content message-content--loading">
                       {streamingText ? (
                         <>
-                          <div
-                            dangerouslySetInnerHTML={{
-                              __html: marked.parse(
-                                extractNextQuestion(streamingText).body
-                              ),
-                            }}
-                          />
                           {streamingRetrieval && (
                             <RetrievalPanel
                               mode="finished"
@@ -845,6 +964,13 @@ export default function ChatInterface() {
                               query={pendingQuery}
                             />
                           )}
+                          <div
+                            dangerouslySetInnerHTML={{
+                              __html: marked.parse(
+                                extractNextQuestion(streamingText).body
+                              ),
+                            }}
+                          />
                         </>
                       ) : (
                         <RetrievalPanel
@@ -908,23 +1034,47 @@ export default function ChatInterface() {
                             }}
                           />
                         ) : (
+                          <span className="prompt-queue-text" title={item.text}>
+                            {item.text}
+                          </span>
+                        )}
+                        <div className="prompt-queue-actions">
                           <button
                             type="button"
-                            className="prompt-queue-text"
+                            className="prompt-queue-action"
                             onClick={() => setEditingQueueId(item.id)}
-                            title="Edit queued prompt"
+                            title="Edit prompt"
+                            aria-label="Edit prompt"
                           >
-                            {item.text}
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                            </svg>
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          className="prompt-queue-remove"
-                          onClick={() => removeQueueItem(activeChatId, item.id)}
-                          aria-label="Remove from queue"
-                        >
-                          ×
-                        </button>
+                          <button
+                            type="button"
+                            className="prompt-queue-action prompt-queue-steer"
+                            onClick={() =>
+                              steerQueuedPrompt(activeChatId, item.id)
+                            }
+                            title="Steer with this prompt now"
+                            aria-label="Steer with this prompt now"
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path d="M3 20V4L22 12L3 20ZM5 17L16.85 12L5 7V10.5L11 12L5 13.5V17Z" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            className="prompt-queue-action prompt-queue-remove"
+                            onClick={() =>
+                              removeQueueItem(activeChatId, item.id)
+                            }
+                            title="Remove from queue"
+                            aria-label="Remove from queue"
+                          >
+                            ×
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
