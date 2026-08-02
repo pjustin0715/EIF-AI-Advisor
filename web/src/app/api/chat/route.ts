@@ -19,6 +19,10 @@ import { isDefaultChatTitle } from "@/lib/drafts";
 import { generateChatTitle } from "@/lib/generate-title";
 import { extractNextQuestion } from "@/lib/next-question";
 import { buildSystemPrompt, retrieveContext } from "@/lib/rag-client";
+import {
+  buildRetrievalPayload,
+  stripRetrievalForViewer,
+} from "@/lib/retrieval";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
@@ -90,8 +94,11 @@ export async function POST(req: NextRequest) {
   }
 
   const systemPrompt = buildSystemPrompt(ragContext);
-  const citations = ragContext.citations;
-  const docUrl = ragContext.doc_url ?? null;
+  const retrievalPayload = buildRetrievalPayload(ragContext);
+  const viewerRetrieval = stripRetrievalForViewer(
+    retrievalPayload,
+    user.role === "admin"
+  );
   const retrievedChunkIds = ragContext.retrieved_chunk_ids;
 
   const stored = readCompactState(history);
@@ -170,7 +177,28 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        send({ type: "citations", citations, doc_url: docUrl });
+        const pause = (ms: number) =>
+          new Promise((resolve) => setTimeout(resolve, ms));
+
+        send({ type: "retrieval_status", step: "searching" });
+        await pause(280);
+        send({
+          type: "retrieval_status",
+          step: "ranking",
+          count: retrievalPayload.sources.length,
+        });
+        await pause(220);
+        send({
+          type: "retrieval",
+          ...(viewerRetrieval || {
+            version: 1,
+            low_grounding: false,
+            doc_url: null,
+            sources: [],
+          }),
+        });
+        send({ type: "retrieval_status", step: "ready" });
+        await pause(160);
         send({ type: "context", ...contextUsage });
 
         const response = await openai.chat.completions.create({
@@ -201,7 +229,10 @@ export async function POST(req: NextRequest) {
           chat_id,
           role: "model",
           content: persistedContent,
-          citations: citations.length ? citations : null,
+          citations:
+            retrievalPayload.sources.length > 0 || retrievalPayload.low_grounding
+              ? retrievalPayload
+              : null,
         });
 
         const latencyMs = Date.now() - startTime;

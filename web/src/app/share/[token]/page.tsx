@@ -4,11 +4,18 @@ import { useEffect, useState } from "react";
 import { marked } from "marked";
 import CopyMessageButton from "@/components/CopyMessageButton";
 import LoginOverlay from "@/components/LoginOverlay";
-import { getAccessToken, authHeaders } from "@/lib/auth-client";
+import RetrievalPanel from "@/components/RetrievalPanel";
+import {
+  authHeaders,
+  getAccessToken,
+  isAdminUser,
+} from "@/lib/auth-client";
 import { extractNextQuestion } from "@/lib/next-question";
+import { normalizeCitations } from "@/lib/retrieval";
 
 export default function SharedChatPage({ params }: { params: { token: string } }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [chat, setChat] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +25,7 @@ export default function SharedChatPage({ params }: { params: { token: string } }
     const token = getAccessToken();
     if (token) {
       setIsAuthenticated(true);
+      setIsAdmin(isAdminUser());
       fetchChat();
     } else {
       setLoading(false);
@@ -48,6 +56,7 @@ export default function SharedChatPage({ params }: { params: { token: string } }
 
   const handleLogin = () => {
     setIsAuthenticated(true);
+    setIsAdmin(isAdminUser());
     fetchChat();
   };
 
@@ -103,9 +112,16 @@ export default function SharedChatPage({ params }: { params: { token: string } }
                       }}
                     />
                     {msg.role !== "user" && (
-                      <CopyMessageButton
-                        text={extractNextQuestion(msg.content || "").body}
-                      />
+                      <>
+                        <RetrievalPanel
+                          mode="finished"
+                          retrieval={normalizeCitations(msg.citations)}
+                          isAdmin={isAdmin}
+                        />
+                        <CopyMessageButton
+                          text={extractNextQuestion(msg.content || "").body}
+                        />
+                      </>
                     )}
                   </div>
                 </div>

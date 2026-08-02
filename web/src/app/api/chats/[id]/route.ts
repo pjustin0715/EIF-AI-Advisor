@@ -9,6 +9,7 @@ import {
   visibleMessages,
   type HistoryMessage,
 } from "@/lib/context-window";
+import { citationsForViewer } from "@/lib/retrieval";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 /** Approximate system + RAG overhead when no live system prompt is available. */
@@ -58,13 +59,22 @@ export async function GET(
     Boolean(stored.summary)
   );
 
+  const isAdmin = user.role === "admin";
+  const safeMessages = visibleMessages(history).map((msg) => ({
+    ...msg,
+    citations: citationsForViewer(
+      (msg as { citations?: unknown }).citations,
+      isAdmin
+    ),
+  }));
+
   return NextResponse.json({
     chat: {
       ...chat,
       context_summary: stored.summary,
       compacted_through_at: stored.compactedThroughAt,
     },
-    messages: visibleMessages(history),
+    messages: safeMessages,
     context_usage,
   });
 }

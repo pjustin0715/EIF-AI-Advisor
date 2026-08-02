@@ -25,18 +25,24 @@ import {
   type ContextUsage,
 } from "@/lib/context-window-shared";
 import { extractNextQuestion } from "@/lib/next-question";
+import {
+  normalizeCitations,
+  type RetrievalPayload,
+  type RetrievalStatusStep,
+} from "@/lib/retrieval";
 import CopyMessageButton from "./CopyMessageButton";
 import EmptyChatState from "./EmptyChatState";
 import ConfirmDialog from "./ConfirmDialog";
 import ContextMeter from "./ContextMeter";
 import LoginOverlay, { LogoutButton } from "./LoginOverlay";
 import NewChatModal from "./NewChatModal";
+import RetrievalPanel from "./RetrievalPanel";
 import Sidebar from "./Sidebar";
 import SuggestionChips from "./SuggestionChips";
 interface Message {
   role: "user" | "model" | "assistant";
   content: string;
-  citations?: string[] | null;
+  citations?: RetrievalPayload | string[] | null;
   suggestion?: string | null;
 }
 interface Chat {
@@ -64,7 +70,13 @@ export default function ChatInterface() {
   const [emptyAdvisorId, setEmptyAdvisorId] = useState("advisor1");
   const [advisorMap, setAdvisorMap] = useState<Record<string, { name: string, purpose?: string }>>({});
   const [streamingText, setStreamingText] = useState("");
-  const [streamingCitations, setStreamingCitations] = useState<string[]>([]);
+  const [streamingRetrieval, setStreamingRetrieval] =
+    useState<RetrievalPayload | null>(null);
+  const [retrievalStatus, setRetrievalStatus] =
+    useState<RetrievalStatusStep | null>(null);
+  const [retrievalRankingCount, setRetrievalRankingCount] = useState<
+    number | null
+  >(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
@@ -336,13 +348,15 @@ export default function ChatInterface() {
     setInput("");
     clearDraft(chatId);
     setLoading(true);
-    setStreamingCitations([]);
+    setStreamingRetrieval(null);
+    setRetrievalStatus(null);
+    setRetrievalRankingCount(null);
     setStreamingText("");
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     const abort = new AbortController();
     abortRef.current = abort;
     let assistantText = "";
-    let assistantCitations: string[] = [];
+    let assistantRetrieval: RetrievalPayload | null = null;
     let assistantSuggestion: string | null = null;
     try {
       const res = await fetch("/api/chat", {
@@ -370,9 +384,18 @@ export default function ChatInterface() {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           const payload = JSON.parse(line.slice(6));
-          if (payload.type === "citations") {
-            assistantCitations = payload.citations || [];
-            setStreamingCitations(assistantCitations);
+          if (payload.type === "retrieval_status") {
+            const step = payload.step as RetrievalStatusStep;
+            setRetrievalStatus(step);
+            if (step === "ranking" && typeof payload.count === "number") {
+              setRetrievalRankingCount(payload.count);
+            }
+          } else if (payload.type === "retrieval") {
+            assistantRetrieval = normalizeCitations(payload);
+            setStreamingRetrieval(assistantRetrieval);
+          } else if (payload.type === "citations") {
+            assistantRetrieval = normalizeCitations(payload.citations);
+            setStreamingRetrieval(assistantRetrieval);
           } else if (payload.type === "context") {
             setContextUsage({
               used: payload.used ?? 0,
@@ -405,7 +428,7 @@ export default function ChatInterface() {
           {
             role: "assistant",
             content: extracted.body,
-            citations: assistantCitations.length ? assistantCitations : null,
+            citations: assistantRetrieval,
             suggestion,
           },
         ]);
@@ -419,7 +442,9 @@ export default function ChatInterface() {
       setStreamingText("");
     } finally {
       setLoading(false);
-      setStreamingCitations([]);
+      setStreamingRetrieval(null);
+      setRetrievalStatus(null);
+      setRetrievalRankingCount(null);
       abortRef.current = null;
       inputRef.current?.focus();
     }
@@ -589,9 +614,16 @@ export default function ChatInterface() {
                               }}
                             />
                             {msg.role !== "user" && (
-                              <CopyMessageButton
-                                text={extractNextQuestion(msg.content || "").body}
-                              />
+                              <>
+                                <RetrievalPanel
+                                  mode="finished"
+                                  retrieval={normalizeCitations(msg.citations)}
+                                  isAdmin={isAdmin}
+                                />
+                                <CopyMessageButton
+                                  text={extractNextQuestion(msg.content || "").body}
+                                />
+                              </>
                             )}
                             {isLatestAi && msg.suggestion && (
                               <SuggestionChips
@@ -611,11 +643,12 @@ export default function ChatInterface() {
                     })}
                   </>
                 )}
-                {loading && (streamingText || streamingCitations.length > 0) && (
+                {loading && (
                   <div className="message message--ai">
                     <div className="avatar ai">AI</div>
                     <div className="message-content message-content--loading">
                       {streamingText ? (
+                        <>
                           <div
                             dangerouslySetInnerHTML={{
                               __html: marked.parse(
@@ -623,59 +656,29 @@ export default function ChatInterface() {
                               ),
                             }}
                           />
+                          {streamingRetrieval && (
+                            <RetrievalPanel
+                              mode="finished"
+                              retrieval={streamingRetrieval}
+                              isAdmin={isAdmin}
+                            />
+                          )}
+                        </>
                       ) : (
-                        <div className="loading">
-                          <div className="dot" />
-                          <div className="dot" />
-                          <div className="dot" />
-                        </div>
+                        <RetrievalPanel
+                          mode="live"
+                          retrieval={streamingRetrieval}
+                          statusStep={retrievalStatus || "searching"}
+                          rankingCount={retrievalRankingCount}
+                          isAdmin={isAdmin}
+                        />
                       )}
-                    </div>
-                  </div>
-                )}
-                {loading && !streamingText && streamingCitations.length === 0 && (
-                  <div className="message message--ai message--loading">
-                    <div className="avatar ai">AI</div>
-                    <div className="message-content message-content--loading">
-                      <div className="loading">
-                        <div className="dot" />
-                        <div className="dot" />
-                        <div className="dot" />
-                      </div>
                     </div>
                   </div>
                 )}
               </div>
             </div>
             <div className="input-container">
-              {activeChatId && (
-                <ContextMeter
-                  usage={(() => {
-                    const draftTokens = Math.ceil(input.length / 4);
-                    if (contextUsage) {
-                      return buildContextUsage(
-                        contextUsage.used + draftTokens,
-                        contextUsage.limit,
-                        contextUsage.compacted
-                      );
-                    }
-                    return buildContextUsage(
-                      estimateConversationTokensClient(
-                        messages,
-                        input,
-                        contextSummary
-                      ),
-                      usableContextTokens(),
-                      Boolean(contextSummary)
-                    );
-                  })()}
-                  compacting={compacting}
-                  canCompact={
-                    !loading && !compacting && messages.length > 10
-                  }
-                  onCompact={handleManualCompact}
-                />
-              )}
               <div className="input-area">
                 <input
                   ref={inputRef}
@@ -704,6 +707,34 @@ export default function ChatInterface() {
                   </button>
                 )}
               </div>
+              {activeChatId && (
+                <ContextMeter
+                  usage={(() => {
+                    const draftTokens = Math.ceil(input.length / 4);
+                    if (contextUsage) {
+                      return buildContextUsage(
+                        contextUsage.used + draftTokens,
+                        contextUsage.limit,
+                        contextUsage.compacted
+                      );
+                    }
+                    return buildContextUsage(
+                      estimateConversationTokensClient(
+                        messages,
+                        input,
+                        contextSummary
+                      ),
+                      usableContextTokens(),
+                      Boolean(contextSummary)
+                    );
+                  })()}
+                  compacting={compacting}
+                  canCompact={
+                    !loading && !compacting && messages.length > 10
+                  }
+                  onCompact={handleManualCompact}
+                />
+              )}
             </div>
           </>
         )}

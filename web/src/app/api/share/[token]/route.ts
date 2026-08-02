@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { visibleMessages, type HistoryMessage } from "@/lib/context-window";
+import { citationsForViewer } from "@/lib/retrieval";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +33,19 @@ export async function GET(
     .lte("created_at", chat.shared_at)
     .order("created_at", { ascending: true });
 
+  const isAdmin = user.role === "admin";
+  const safeMessages = visibleMessages(
+    (messages || []) as HistoryMessage[]
+  ).map((msg) => ({
+    ...msg,
+    citations: citationsForViewer(
+      (msg as { citations?: unknown }).citations,
+      isAdmin
+    ),
+  }));
+
   return NextResponse.json({
     chat,
-    messages: visibleMessages((messages || []) as HistoryMessage[]),
+    messages: safeMessages,
   });
 }
