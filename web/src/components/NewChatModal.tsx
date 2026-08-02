@@ -49,7 +49,9 @@ export default function NewChatModal({ open, onClose, onCreated }: Props) {
     <div className="modal-overlay">
       <div className="modal-box">
         <h3>Create New Chat</h3>
-        <p className="modal-hint">Title is generated automatically from your first message.</p>
+        <p className="modal-hint">
+          Title is generated automatically after your first exchange.
+        </p>
         <select value={advisorId} onChange={(e) => setAdvisorId(e.target.value)}>
           {Object.entries(advisors).map(([id, adv]) => (
             <option key={id} value={id}>

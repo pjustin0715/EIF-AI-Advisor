@@ -70,10 +70,7 @@ export async function POST(req: NextRequest) {
     .order("created_at", { ascending: true });
 
   const history = (historyRows || []) as HistoryMessage[];
-  const isFirstMessage =
-    history.length === 1 && history[0]?.role === "user";
-  const shouldAutoTitle =
-    isFirstMessage && isDefaultChatTitle(chat.title as string);
+  const shouldAutoTitle = isDefaultChatTitle(chat.title as string);
 
   let ragContext;
   try {
@@ -173,6 +170,13 @@ export async function POST(req: NextRequest) {
 
       const persistAndSendTitle = async (newTitle: string) => {
         if (titleSent || !newTitle) return;
+        const { data: currentChat } = await supabase
+          .from("chats")
+          .select("title")
+          .eq("id", chat_id)
+          .maybeSingle();
+        if (!isDefaultChatTitle(currentChat?.title as string)) return;
+
         const { error: updateError } = await supabase
           .from("chats")
           .update({ title: newTitle, updated_at: new Date().toISOString() })
@@ -186,15 +190,6 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        // Generate a real LLM title in parallel with the retrieval trace.
-        const titleWork = shouldAutoTitle
-          ? generateChatTitle(prompt, chat.advisor_id as string)
-              .then((newTitle) => persistAndSendTitle(newTitle))
-              .catch((err) =>
-                console.error("Auto-title generation failed:", err)
-              )
-          : Promise.resolve();
-
         const pause = (ms: number) =>
           new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -218,8 +213,6 @@ export async function POST(req: NextRequest) {
         send({ type: "retrieval_status", step: "ready" });
         await pause(160);
         send({ type: "context", ...contextUsage });
-
-        await titleWork;
 
         const openai = getOpenRouterClient();
         const response = await openai.chat.completions.create(
@@ -311,6 +304,15 @@ export async function POST(req: NextRequest) {
 
         if (nextQuestion) {
           send({ type: "suggestion", question: nextQuestion });
+        }
+
+        if (shouldAutoTitle && persistedContent.trim()) {
+          const newTitle = await generateChatTitle(
+            prompt,
+            persistedContent,
+            chat.advisor_id as string
+          );
+          await persistAndSendTitle(newTitle);
         }
 
         send({ type: "done", latency_ms: latencyMs });

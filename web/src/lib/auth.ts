@@ -13,7 +13,7 @@ function getSecret() {
 export async function createAccessToken(email: string): Promise<string> {
   const { getSupabaseAdmin } = await import("./supabase");
   const supabase = getSupabaseAdmin();
-  const { data } = await supabase.from("allowed_users").select("role").eq("email", email).single();
+  const { data } = await supabase.from("allowed_users").select("role").ilike("email", email).single();
   const role = data?.role || "eif";
 
   return new SignJWT({ sub: email, role })

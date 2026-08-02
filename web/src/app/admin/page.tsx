@@ -34,18 +34,36 @@ export default function AdminDashboard() {
         fetch("/api/admin/advisors", { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
-      if (!statsRes.ok || !modelsRes.ok || !advisorsRes.ok) throw new Error("Unauthorized");
+      if ([statsRes, modelsRes, advisorsRes].some((res) => res.status === 401)) {
+        setError("You do not have permission to view this page. Please log in with an Admin account.");
+        setLoading(false);
+        return;
+      }
+
+      if (!statsRes.ok || !modelsRes.ok) {
+        const failed = !statsRes.ok ? await statsRes.text() : await modelsRes.text();
+        setError(`Failed to load admin dashboard: ${failed || "Unknown error"}`);
+        setLoading(false);
+        return;
+      }
 
       const statsData = await statsRes.json();
       const modelsData = await modelsRes.json();
-      const advisorsData = await advisorsRes.json();
 
       setStats(statsData.stats);
       setModels(modelsData.models);
-      setAdvisors(Array.isArray(advisorsData) ? advisorsData : []);
+
+      if (advisorsRes.ok) {
+        const advisorsData = await advisorsRes.json();
+        setAdvisors(Array.isArray(advisorsData) ? advisorsData : []);
+      } else {
+        console.error("Failed to load advisors:", await advisorsRes.text());
+        setAdvisors([]);
+      }
+
       setLoading(false);
     } catch {
-      setError("You do not have permission to view this page. Please log in with an Admin account.");
+      setError("Failed to load admin dashboard. Please try again.");
       setLoading(false);
     }
   };

@@ -19,11 +19,12 @@ function titleModel(): string {
 }
 
 export async function generateChatTitle(
-  firstMessage: string,
+  userMessage: string,
+  assistantReply: string,
   advisorId?: string
 ): Promise<string> {
   const advisorLabel = ADVISOR_LABELS[advisorId || ""] || "AI Advisor";
-  const fallback = titleFromPrompt(firstMessage);
+  const fallback = titleFromPrompt(userMessage);
 
   try {
     const openai = getOpenRouterClient();
@@ -35,12 +36,15 @@ export async function generateChatTitle(
         {
           role: "system",
           content:
-            `Write a short chat title (3-6 words) summarizing this EIF mentoring question. ` +
+            `Write a short chat title (3-6 words) summarizing this EIF mentoring exchange. ` +
+            `Use both the user's question and the advisor's reply. ` +
             `No quotes, no ending punctuation. Advisor context: ${advisorLabel}.`,
         },
         {
           role: "user",
-          content: firstMessage.slice(0, 400),
+          content:
+            `User question:\n${userMessage.slice(0, 400)}\n\n` +
+            `Advisor reply:\n${assistantReply.slice(0, 600)}`,
         },
       ],
     });

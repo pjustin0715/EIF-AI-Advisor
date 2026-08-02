@@ -26,13 +26,38 @@ function extractDocId(urlOrId: string) {
   return urlOrId.trim();
 }
 
+function getAdvisorsFromEnv() {
+  const legacyNames: Record<string, string> = {
+    advisor1: "Data Dashboard Advisor",
+    advisor2: "SSOT Memo Advisor",
+    advisor3: "Data Modeling Advisor",
+  };
+  const legacyDocs: Record<string, string | undefined> = {
+    advisor1: process.env.DOC_ID_ADVISOR1,
+    advisor2: process.env.DOC_ID_ADVISOR2,
+    advisor3: process.env.DOC_ID_ADVISOR3,
+  };
+
+  return Object.entries(legacyDocs)
+    .filter(([, docId]) => docId)
+    .map(([id, docId], index) => ({
+      id,
+      name: legacyNames[id] ?? id,
+      is_active: true,
+      prompt: `https://docs.google.com/document/d/${docId}`,
+      purpose: "",
+      doc_id: docId!,
+      rowIndex: index + 2,
+    }));
+}
+
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "admin") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const spreadsheetId = process.env.SPREADSHEET_ID;
   if (!spreadsheetId) {
-    return NextResponse.json({ error: "Missing SPREADSHEET_ID" }, { status: 500 });
+    return NextResponse.json(getAdvisorsFromEnv());
   }
 
   try {
@@ -44,7 +69,7 @@ export async function GET(req: NextRequest) {
 
     const rows = response.data.values || [];
     if (rows.length === 0) {
-      return NextResponse.json([]);
+      return NextResponse.json(getAdvisorsFromEnv());
     }
 
     // Skip header
@@ -66,10 +91,10 @@ export async function GET(req: NextRequest) {
       };
     }).filter(a => a.doc_id); // Filter out empty rows
 
-    return NextResponse.json(advisors);
+    return NextResponse.json(advisors.length > 0 ? advisors : getAdvisorsFromEnv());
   } catch (error: any) {
     console.error("Sheets GET Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(getAdvisorsFromEnv());
   }
 }
 

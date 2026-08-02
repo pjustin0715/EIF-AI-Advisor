@@ -337,9 +337,6 @@ export default function RetrievalPanel({
             const reached = done || active || readyDone || index <= activeIndex;
             const isExpanded = expandedStep === step;
             let label = STEP_LABELS[step];
-            if (step === "ranking" && typeof rankingCount === "number") {
-              label = `Ranking matches (${rankingCount})`;
-            }
 
             return (
               <TimelineStep
@@ -374,7 +371,7 @@ export default function RetrievalPanel({
   }
 
   const count = retrieval?.sources.length ?? 0;
-  const summary = count > 0 ? `Sources (${count})` : "Sources";
+  const summary = "Sources";
 
   return (
     <div
@@ -395,9 +392,6 @@ export default function RetrievalPanel({
             {STEP_ORDER.filter((step) => step === "ranking").map((step) => {
               const isExpanded = expandedStep === step;
               let label = STEP_LABELS[step];
-              if (step === "ranking" && count > 0) {
-                label = `Ranking matches (${count})`;
-              }
               return (
                 <TimelineStep
                   key={step}
