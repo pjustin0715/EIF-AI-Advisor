@@ -959,11 +959,13 @@ export default function ChatInterface() {
                                 ),
                               }}
                             />
-                            {msg.role !== "user" && (
-                              <CopyMessageButton
-                                text={extractNextQuestion(msg.content || "").body}
-                              />
-                            )}
+                            <CopyMessageButton
+                              text={
+                                msg.role === "user"
+                                  ? msg.content || ""
+                                  : extractNextQuestion(msg.content || "").body
+                              }
+                            />
                             {isLatestAi && msg.suggestion && (
                               <SuggestionChips
                                 suggestions={[

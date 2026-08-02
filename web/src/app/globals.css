@@ -573,6 +573,13 @@ body {
   display: flex;
   justify-content: flex-end;
   margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.message:hover .message-actions,
+.message:focus-within .message-actions {
+  opacity: 1;
 }
 
 .copy-message-btn {
