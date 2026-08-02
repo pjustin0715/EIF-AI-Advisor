@@ -117,6 +117,13 @@ export default function SharedChatPage({ params }: { params: { token: string } }
                           mode="finished"
                           retrieval={normalizeCitations(msg.citations)}
                           isAdmin={isAdmin}
+                          query={
+                            messages
+                              .slice(0, idx)
+                              .reverse()
+                              .find((m: { role?: string }) => m.role === "user")
+                              ?.content || null
+                          }
                         />
                         <CopyMessageButton
                           text={extractNextQuestion(msg.content || "").body}

@@ -77,6 +77,7 @@ export default function ChatInterface() {
   const [retrievalRankingCount, setRetrievalRankingCount] = useState<
     number | null
   >(null);
+  const [pendingQuery, setPendingQuery] = useState<string | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
@@ -351,6 +352,7 @@ export default function ChatInterface() {
     setStreamingRetrieval(null);
     setRetrievalStatus(null);
     setRetrievalRankingCount(null);
+    setPendingQuery(text);
     setStreamingText("");
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     const abort = new AbortController();
@@ -445,6 +447,7 @@ export default function ChatInterface() {
       setStreamingRetrieval(null);
       setRetrievalStatus(null);
       setRetrievalRankingCount(null);
+      setPendingQuery(null);
       abortRef.current = null;
       inputRef.current?.focus();
     }
@@ -619,6 +622,13 @@ export default function ChatInterface() {
                                   mode="finished"
                                   retrieval={normalizeCitations(msg.citations)}
                                   isAdmin={isAdmin}
+                                  query={
+                                    messages
+                                      .slice(0, idx)
+                                      .reverse()
+                                      .find((m) => m.role === "user")?.content ||
+                                    null
+                                  }
                                 />
                                 <CopyMessageButton
                                   text={extractNextQuestion(msg.content || "").body}
@@ -661,6 +671,7 @@ export default function ChatInterface() {
                               mode="finished"
                               retrieval={streamingRetrieval}
                               isAdmin={isAdmin}
+                              query={pendingQuery}
                             />
                           )}
                         </>
@@ -671,6 +682,7 @@ export default function ChatInterface() {
                           statusStep={retrievalStatus || "searching"}
                           rankingCount={retrievalRankingCount}
                           isAdmin={isAdmin}
+                          query={pendingQuery}
                         />
                       )}
                     </div>
