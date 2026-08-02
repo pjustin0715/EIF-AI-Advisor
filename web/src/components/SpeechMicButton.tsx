@@ -1,6 +1,6 @@
 "use client";
 
-import { Mic, MicOff } from "lucide-react";
+import { Mic, Square } from "lucide-react";
 
 interface Props {
   listening: boolean;
@@ -34,7 +34,7 @@ export default function SpeechMicButton({
       aria-pressed={listening}
     >
       {listening ? (
-        <MicOff aria-hidden="true" />
+        <Square aria-hidden="true" fill="currentColor" />
       ) : (
         <Mic aria-hidden="true" />
       )}
