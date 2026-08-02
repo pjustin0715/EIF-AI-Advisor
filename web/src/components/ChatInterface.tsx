@@ -1425,7 +1425,7 @@ export default function ChatInterface({
                     }
                   }}
                 />
-                {activeChatId && (
+                {activeChatId && !isSharedMode && (
                   <ContextMeter
                     usage={(() => {
                       const draftTokens = Math.ceil(input.length / 4);
