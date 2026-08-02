@@ -255,12 +255,15 @@ body {
   cursor: pointer;
   opacity: 0;
   flex-shrink: 0;
-  padding: 0 4px;
+  padding: 0;
+  width: 24px;
   height: 24px;
-  line-height: 1;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  line-height: 0;
+}
+
+.delete-btn svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 .chat-item:hover .delete-btn {
@@ -387,6 +390,47 @@ body {
   background: #f3f5fb;
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+.message-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.copy-message-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.copy-message-btn:hover {
+  background: var(--item-hover);
+  color: var(--text-main);
+}
+
+.copy-message-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.copy-message-btn--copied {
+  color: #00b0a4;
+}
+
+.copy-message-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
 }
 
 .citations {

@@ -25,6 +25,7 @@ import {
   type ContextUsage,
 } from "@/lib/context-window-shared";
 import { extractNextQuestion } from "@/lib/next-question";
+import CopyMessageButton from "./CopyMessageButton";
 import EmptyChatState from "./EmptyChatState";
 import ConfirmDialog from "./ConfirmDialog";
 import ContextMeter from "./ContextMeter";
@@ -587,6 +588,11 @@ export default function ChatInterface() {
                                 ),
                               }}
                             />
+                            {msg.role !== "user" && (
+                              <CopyMessageButton
+                                text={extractNextQuestion(msg.content || "").body}
+                              />
+                            )}
                             {isLatestAi && msg.suggestion && (
                               <SuggestionChips
                                 suggestions={[

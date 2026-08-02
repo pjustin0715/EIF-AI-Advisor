@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { marked } from "marked";
+import CopyMessageButton from "@/components/CopyMessageButton";
 import LoginOverlay from "@/components/LoginOverlay";
 import { getAccessToken, authHeaders } from "@/lib/auth-client";
 import { extractNextQuestion } from "@/lib/next-question";
@@ -101,6 +102,11 @@ export default function SharedChatPage({ params }: { params: { token: string } }
                         ),
                       }}
                     />
+                    {msg.role !== "user" && (
+                      <CopyMessageButton
+                        text={extractNextQuestion(msg.content || "").body}
+                      />
+                    )}
                   </div>
                 </div>
               ))
