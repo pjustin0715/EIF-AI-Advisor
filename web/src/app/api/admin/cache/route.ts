@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { getRagServiceUrl, ragServiceHeaders } from "@/lib/rag-config";
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req);
@@ -7,15 +8,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const baseUrl = process.env.RAG_SERVICE_URL || "http://localhost:8001";
-  const secret = process.env.RAG_SERVICE_SECRET || "";
+  const baseUrl = getRagServiceUrl();
 
   try {
     const res = await fetch(`${baseUrl}/reindex?force=true`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(secret ? { "X-RAG-Secret": secret } : {}),
+        ...ragServiceHeaders(),
       },
     });
 

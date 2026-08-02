@@ -40,12 +40,15 @@ cd web && npm install
 ### 4. Run locally
 
 ```bash
-pnpm run dev        # starts both services in parallel
-pnpm run dev:web    # Next.js only (port 3000)
-pnpm run dev:rag    # FastAPI only (port 8001, with --reload)
+npm run dev         # Next.js only → uses deployed RAG on Render
+npm run dev:web     # same as above (port 3000)
+npm run dev:full    # local Next.js + local FastAPI (port 8001)
+npm run dev:rag     # FastAPI only (set RAG_SERVICE_URL=http://localhost:8001 in web/.env.local)
 ```
 
 Open http://localhost:3000
+
+The web app defaults to the deployed RAG service (`https://eif-rag-service.onrender.com`). First request after idle may take ~30–60s while Render wakes up.
 
 ### 5. Initial index (first run only)
 

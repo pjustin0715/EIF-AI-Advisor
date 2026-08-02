@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { getCurrentUser } from "@/lib/auth";
+import { getRagServiceUrl, ragServiceHeaders } from "@/lib/rag-config";
 
 // Ensure we don't cache this route
 export const dynamic = 'force-dynamic';
@@ -96,11 +97,9 @@ export async function POST(req: NextRequest) {
     });
 
     // Also call the RAG service /reindex to invalidate backend cache immediately
-    const ragUrl = process.env.RAG_SERVICE_URL || "http://localhost:8001";
-    const ragSecret = process.env.RAG_SERVICE_SECRET || "";
-    fetch(`${ragUrl}/reindex?force=true`, {
+    fetch(`${getRagServiceUrl()}/reindex?force=true`, {
       method: "POST",
-      headers: { ...(ragSecret ? { "X-RAG-Secret": ragSecret } : {}) }
+      headers: ragServiceHeaders(),
     }).catch(e => console.error("Failed to trigger reindex:", e));
 
     return NextResponse.json({ success: true });
@@ -135,11 +134,9 @@ export async function PUT(req: NextRequest) {
       },
     });
 
-    const ragUrl = process.env.RAG_SERVICE_URL || "http://localhost:8001";
-    const ragSecret = process.env.RAG_SERVICE_SECRET || "";
-    fetch(`${ragUrl}/reindex?force=true`, {
+    fetch(`${getRagServiceUrl()}/reindex?force=true`, {
       method: "POST",
-      headers: { ...(ragSecret ? { "X-RAG-Secret": ragSecret } : {}) }
+      headers: ragServiceHeaders(),
     }).catch(e => console.error("Failed to trigger reindex:", e));
 
     return NextResponse.json({ success: true });

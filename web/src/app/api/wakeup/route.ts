@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getRagServiceUrl } from "@/lib/rag-config";
 
 export async function GET(req: NextRequest) {
-  const baseUrl = process.env.RAG_SERVICE_URL || "http://localhost:8001";
+  const baseUrl = getRagServiceUrl();
   try {
     // Simply fetch the health endpoint to wake up the Render service
     // We don't await the text/json so it fails/succeeds quickly

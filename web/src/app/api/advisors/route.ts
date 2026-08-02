@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
+import { getRagServiceUrl, ragServiceHeaders } from "@/lib/rag-config";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const baseUrl = process.env.RAG_SERVICE_URL || "http://localhost:8001";
-    const secret = process.env.RAG_SERVICE_SECRET || "";
+    const baseUrl = getRagServiceUrl();
     
     const res = await fetch(`${baseUrl}/advisors`, {
-      headers: secret ? { "X-RAG-Secret": secret } : {},
+      headers: ragServiceHeaders(),
       cache: 'no-store'
     });
     

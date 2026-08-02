@@ -13,12 +13,13 @@ export interface RagRetrieveResponse {
   doc_url: string | null;
 }
 
+import { getRagServiceUrl, ragServiceHeaders } from "./rag-config";
+
 export async function retrieveContext(
   query: string,
   advisorId: string
 ): Promise<RagRetrieveResponse> {
-  const baseUrl = process.env.RAG_SERVICE_URL || "http://localhost:8001";
-  const secret = process.env.RAG_SERVICE_SECRET || "";
+  const baseUrl = getRagServiceUrl();
 
   const res = await fetch(
     `${baseUrl}/retrieve?advisor_id=${encodeURIComponent(advisorId)}`,
@@ -26,7 +27,7 @@ export async function retrieveContext(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(secret ? { "X-RAG-Secret": secret } : {}),
+        ...ragServiceHeaders(),
       },
       body: JSON.stringify({ query }),
       cache: "no-store",
