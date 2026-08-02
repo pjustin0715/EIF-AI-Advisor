@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { visibleMessages, type HistoryMessage } from "@/lib/context-window";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -31,5 +32,8 @@ export async function GET(
     .lte("created_at", chat.shared_at)
     .order("created_at", { ascending: true });
 
-  return NextResponse.json({ chat, messages: messages || [] });
+  return NextResponse.json({
+    chat,
+    messages: visibleMessages((messages || []) as HistoryMessage[]),
+  });
 }

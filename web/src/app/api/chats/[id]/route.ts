@@ -4,7 +4,9 @@ import {
   buildContextUsage,
   estimatePromptTokens,
   filterHistoryForPrompt,
+  readCompactState,
   usableContextTokens,
+  visibleMessages,
   type HistoryMessage,
 } from "@/lib/context-window";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -42,25 +44,27 @@ export async function GET(
     .order("created_at", { ascending: true });
 
   const history = (messages || []) as HistoryMessage[];
+  const stored = readCompactState(history);
   const promptHistory = filterHistoryForPrompt(
     history,
-    chat.compacted_through_at as string | null
+    stored.compactedThroughAt
   );
   const used =
-    estimatePromptTokens(
-      "",
-      promptHistory,
-      chat.context_summary as string | null
-    ) + SYSTEM_OVERHEAD_TOKENS;
+    estimatePromptTokens("", promptHistory, stored.summary) +
+    SYSTEM_OVERHEAD_TOKENS;
   const context_usage = buildContextUsage(
     used,
     usableContextTokens(),
-    Boolean(chat.context_summary)
+    Boolean(stored.summary)
   );
 
   return NextResponse.json({
-    chat,
-    messages: messages || [],
+    chat: {
+      ...chat,
+      context_summary: stored.summary,
+      compacted_through_at: stored.compactedThroughAt,
+    },
+    messages: visibleMessages(history),
     context_usage,
   });
 }

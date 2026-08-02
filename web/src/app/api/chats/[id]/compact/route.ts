@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { saveCompactSummary } from "@/lib/compact-store";
 import {
   buildContextUsage,
   estimatePromptTokens,
   forceCompactHistory,
+  readCompactState,
   type HistoryMessage,
   usableContextTokens,
 } from "@/lib/context-window";
@@ -11,7 +13,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-/** POST — manually compact this chat's older turns into context_summary. */
+/** POST — manually compact this chat's older turns into a summary message. */
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -40,13 +42,14 @@ export async function POST(
     .order("created_at", { ascending: true });
 
   const history = (messages || []) as HistoryMessage[];
+  const stored = readCompactState(history);
 
   let result;
   try {
     result = await forceCompactHistory({
       history,
-      existingSummary: chat.context_summary as string | null,
-      compactedThroughAt: chat.compacted_through_at as string | null,
+      existingSummary: stored.summary,
+      compactedThroughAt: stored.compactedThroughAt,
     });
   } catch (err) {
     const message =
@@ -56,32 +59,33 @@ export async function POST(
 
   if (!result.compacted) {
     const used =
-      estimatePromptTokens("", result.keptHistory, result.summary || chat.context_summary) +
-      2500;
+      estimatePromptTokens(
+        "",
+        result.keptHistory,
+        result.summary || stored.summary
+      ) + 2500;
     return NextResponse.json({
       compacted: false,
       reason:
         "Not enough older messages to compact. Keep chatting, then try again.",
-      context_summary: chat.context_summary ?? null,
-      compacted_through_at: chat.compacted_through_at ?? null,
+      context_summary: stored.summary,
+      compacted_through_at: stored.compactedThroughAt,
       context_usage: buildContextUsage(
         used,
         usableContextTokens(),
-        Boolean(chat.context_summary)
+        Boolean(stored.summary)
       ),
     });
   }
 
-  const { error: updateError } = await supabase
-    .from("chats")
-    .update({
-      context_summary: result.summary,
-      compacted_through_at: result.compactedThroughAt,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", params.id);
+  const { error: saveError } = await saveCompactSummary(
+    supabase,
+    params.id,
+    result.summary,
+    result.compactedThroughAt
+  );
 
-  if (updateError) {
+  if (saveError) {
     return NextResponse.json(
       { error: "Failed to save compact summary" },
       { status: 500 }
@@ -90,11 +94,7 @@ export async function POST(
 
   const used =
     estimatePromptTokens("", result.keptHistory, result.summary) + 2500;
-  const context_usage = buildContextUsage(
-    used,
-    usableContextTokens(),
-    true
-  );
+  const context_usage = buildContextUsage(used, usableContextTokens(), true);
 
   return NextResponse.json({
     compacted: true,

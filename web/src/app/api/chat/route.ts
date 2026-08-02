@@ -1,9 +1,11 @@
 import { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { saveCompactSummary } from "@/lib/compact-store";
 import {
   contextUsageFromPrompt,
   filterHistoryForPrompt,
   maybeCompactHistory,
+  readCompactState,
   toOpenAIMessages,
   type HistoryMessage,
 } from "@/lib/context-window";
@@ -92,9 +94,9 @@ export async function POST(req: NextRequest) {
   const docUrl = ragContext.doc_url ?? null;
   const retrievedChunkIds = ragContext.retrieved_chunk_ids;
 
-  let contextSummary = (chat.context_summary as string | null) || null;
-  let compactedThroughAt =
-    (chat.compacted_through_at as string | null) || null;
+  const stored = readCompactState(history);
+  let contextSummary = stored.summary;
+  let compactedThroughAt = stored.compactedThroughAt;
   let didCompact = false;
   let promptHistory = filterHistoryForPrompt(history, compactedThroughAt);
 
@@ -111,14 +113,15 @@ export async function POST(req: NextRequest) {
       didCompact = true;
       contextSummary = compactResult.summary;
       compactedThroughAt = compactResult.compactedThroughAt;
-      await supabase
-        .from("chats")
-        .update({
-          context_summary: contextSummary,
-          compacted_through_at: compactedThroughAt,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", chat_id);
+      const { error: saveError } = await saveCompactSummary(
+        supabase,
+        chat_id,
+        contextSummary,
+        compactedThroughAt
+      );
+      if (saveError) {
+        console.error("Failed to save compact summary:", saveError);
+      }
     } else if (compactResult.summary) {
       contextSummary = compactResult.summary;
     }

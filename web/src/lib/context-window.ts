@@ -29,12 +29,55 @@ export const KEEP_RECENT_MESSAGES = Number(
   process.env.KEEP_RECENT_MESSAGES || 10
 );
 
+export const CONTEXT_SUMMARY_CITATION = {
+  type: "context_summary",
+} as const;
+
 export type HistoryMessage = {
   id?: string;
   role: string;
   content: string;
   created_at?: string;
+  citations?: unknown;
 };
+
+export function isContextSummaryMessage(m: HistoryMessage): boolean {
+  const c = m.citations;
+  return (
+    !!c &&
+    typeof c === "object" &&
+    !Array.isArray(c) &&
+    (c as { type?: string }).type === CONTEXT_SUMMARY_CITATION.type
+  );
+}
+
+/** Read latest compact summary stored as a special message row (no schema migration). */
+export function readCompactState(history: HistoryMessage[]): {
+  summary: string | null;
+  compactedThroughAt: string | null;
+} {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const m = history[i];
+    if (!isContextSummaryMessage(m)) continue;
+    const meta = m.citations as {
+      type: string;
+      compacted_through_at?: string;
+    };
+    return {
+      summary: m.content || null,
+      compactedThroughAt: meta.compacted_through_at || m.created_at || null,
+    };
+  }
+  return { summary: null, compactedThroughAt: null };
+}
+
+export function visibleMessages<T extends HistoryMessage>(messages: T[]): T[] {
+  return messages.filter((m) => !isContextSummaryMessage(m));
+}
+
+export function conversationMessages(history: HistoryMessage[]): HistoryMessage[] {
+  return history.filter((m) => !isContextSummaryMessage(m));
+}
 
 export function usableContextTokens(): number {
   return usableShared(CONTEXT_WINDOW_TOKENS, OUTPUT_RESERVE_TOKENS);
@@ -62,9 +105,10 @@ export function filterHistoryForPrompt(
   history: HistoryMessage[],
   compactedThroughAt?: string | null
 ): HistoryMessage[] {
-  if (!compactedThroughAt) return history;
+  const conv = conversationMessages(history);
+  if (!compactedThroughAt) return conv;
   const cutoff = new Date(compactedThroughAt).getTime();
-  return history.filter((m) => {
+  return conv.filter((m) => {
     if (!m.created_at) return true;
     return new Date(m.created_at).getTime() > cutoff;
   });
