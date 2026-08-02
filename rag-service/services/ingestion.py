@@ -8,7 +8,7 @@ from services.embeddings import EmbeddingService
 from services.chunker import chunk_document
 from services.db import get_supabase
 from services.voice_digest import generate_voice_digest
-from services.sheets import get_advisors
+from services.sheets import get_advisors, resolve_advisor_id
 
 DNA_DOC_KEY = "company_dna"
 
@@ -29,9 +29,10 @@ def _resolve_doc_id(kind: str, advisor_id: str | None = None) -> str:
     if kind == "dna":
         return settings.doc_id_company_dna
     if advisor_id:
-        advisors = get_advisors()
-        if advisor_id in advisors:
-            return advisors[advisor_id].get("doc_id", "")
+        resolved_id = resolve_advisor_id(advisor_id)
+        if resolved_id:
+            advisors = get_advisors()
+            return advisors[resolved_id].get("doc_id", "")
     return ""
 
 

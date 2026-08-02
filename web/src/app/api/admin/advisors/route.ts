@@ -56,14 +56,15 @@ export async function GET(req: NextRequest) {
       const docId = extractDocId(promptLink);
 
       return {
-        id: docId,
+        id: `advisor${index + 1}`,
         name,
         is_active: isActiveStr === "true",
         prompt: promptLink,
         purpose,
+        doc_id: docId,
         rowIndex: index + 2, // 1-indexed, +1 for header
       };
-    }).filter(a => a.id); // Filter out empty rows
+    }).filter(a => a.doc_id); // Filter out empty rows
 
     return NextResponse.json(advisors);
   } catch (error: any) {

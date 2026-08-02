@@ -27,6 +27,32 @@ def extract_doc_id(url_or_id: str) -> str:
     # If it doesn't match the URL pattern, assume it's just the ID
     return url_or_id.strip()
 
+def _advisors_from_env() -> dict[str, dict[str, Any]]:
+    settings = get_settings()
+    advisors: dict[str, dict[str, Any]] = {}
+    legacy_names = {
+        "advisor1": "Data Dashboard Advisor",
+        "advisor2": "SSOT Memo Advisor",
+        "advisor3": "Data Modeling Advisor",
+    }
+    legacy_docs = {
+        "advisor1": settings.doc_id_advisor1,
+        "advisor2": settings.doc_id_advisor2,
+        "advisor3": settings.doc_id_advisor3,
+    }
+    for slug, doc_id in legacy_docs.items():
+        if not doc_id:
+            continue
+        advisors[slug] = {
+            "id": slug,
+            "name": legacy_names[slug],
+            "is_active": True,
+            "doc_id": doc_id,
+            "purpose": "",
+        }
+    return advisors
+
+
 def get_advisors(force_refresh: bool = False) -> dict[str, dict[str, Any]]:
     global _advisors_cache
     if _advisors_cache is not None and not force_refresh:
@@ -35,16 +61,17 @@ def get_advisors(force_refresh: bool = False) -> dict[str, dict[str, Any]]:
     settings = get_settings()
     spreadsheet_id = settings.spreadsheet_id
     if not spreadsheet_id:
-        print("Warning: SPREADSHEET_ID not set. Using empty advisors list.")
-        return {}
+        print("Warning: SPREADSHEET_ID not set. Falling back to DOC_ID_ADVISOR env vars.")
+        _advisors_cache = _advisors_from_env()
+        return _advisors_cache
 
     service = get_sheets_service()
     if not service:
         print("Failed to initialize Google Sheets service.")
-        return {}
+        _advisors_cache = _advisors_from_env()
+        return _advisors_cache
 
     try:
-        # Assuming the sheet is the first one, or named "Sheet1". Using generic range "A:D"
         # Columns: advisor_name, is_active, prompt, purpose
         result = service.spreadsheets().values().get(
             spreadsheetId=spreadsheet_id,
@@ -54,14 +81,12 @@ def get_advisors(force_refresh: bool = False) -> dict[str, dict[str, Any]]:
         rows = result.get('values', [])
         if not rows:
             print("No data found in spreadsheet.")
-            return {}
+            _advisors_cache = _advisors_from_env()
+            return _advisors_cache
 
-        # Skip header row
-        headers = rows[0]
         advisors = {}
 
-        for row in rows[1:]:
-            # Pad row if it has empty trailing columns
+        for index, row in enumerate(rows[1:], start=1):
             row += [""] * (4 - len(row))
             name, is_active_str, prompt_link, purpose = row[:4]
 
@@ -70,19 +95,49 @@ def get_advisors(force_refresh: bool = False) -> dict[str, dict[str, Any]]:
                 continue
 
             is_active = is_active_str.strip().lower() == "true"
+            slug = f"advisor{index}"
 
-            # Use doc_id as the unique key!
-            advisors[doc_id] = {
-                "id": doc_id,
+            advisors[slug] = {
+                "id": slug,
                 "name": name.strip(),
                 "is_active": is_active,
                 "doc_id": doc_id,
                 "purpose": purpose.strip()
             }
 
-        _advisors_cache = advisors
-        return advisors
+        _advisors_cache = advisors if advisors else _advisors_from_env()
+        return _advisors_cache
 
     except Exception as exc:
         print(f"Failed to fetch advisors from Google Sheets: {exc}")
-        return _advisors_cache or {}
+        fallback = _advisors_cache or _advisors_from_env()
+        _advisors_cache = fallback
+        return fallback
+
+
+def resolve_advisor_id(advisor_id: str) -> str | None:
+    """Map slug, legacy slug, or Google Doc ID to canonical advisor slug."""
+    if not advisor_id:
+        return None
+
+    advisors = get_advisors()
+    if advisor_id in advisors:
+        return advisor_id
+
+    for slug, adv in advisors.items():
+        if adv.get("doc_id") == advisor_id:
+            return slug
+
+    settings = get_settings()
+    legacy_doc_ids = {
+        "advisor1": settings.doc_id_advisor1,
+        "advisor2": settings.doc_id_advisor2,
+        "advisor3": settings.doc_id_advisor3,
+    }
+    legacy_doc = legacy_doc_ids.get(advisor_id, "")
+    if legacy_doc:
+        for slug, adv in advisors.items():
+            if adv.get("doc_id") == legacy_doc:
+                return slug
+
+    return None

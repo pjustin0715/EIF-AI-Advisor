@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from config import get_settings
 from services.docs import fetch_doc_metadata, fetch_doc_text
-from services.sheets import get_advisors
+from services.sheets import get_advisors, resolve_advisor_id
 
 
 @dataclass
@@ -19,9 +19,10 @@ _advisor_cache: dict[str, CachedPrompt] = {}
 def get_advisor_prompt(advisor_id: str) -> str:
     settings = get_settings()
     advisors = get_advisors()
-    
-    # Fallback to first available advisor if ID is invalid
-    safe_id = advisor_id if advisor_id in advisors else (list(advisors.keys())[0] if advisors else "")
+
+    safe_id = resolve_advisor_id(advisor_id) or (
+        list(advisors.keys())[0] if advisors else ""
+    )
     if not safe_id:
         return ""
         

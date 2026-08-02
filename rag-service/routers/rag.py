@@ -7,7 +7,7 @@ from config import get_settings
 from services.ingestion import reindex_all
 from services.prompt_cache import get_advisor_prompt, invalidate_advisor_cache
 from services.retrieval import retrieve_context
-from services.sheets import get_advisors
+from services.sheets import get_advisors, resolve_advisor_id
 
 router = APIRouter()
 
@@ -43,12 +43,12 @@ def retrieve(
     advisor_id: str,
     _: None = Depends(verify_service_secret),
 ):
-    advisors = get_advisors()
-    if advisor_id not in advisors:
+    resolved_id = resolve_advisor_id(advisor_id)
+    if not resolved_id:
         raise HTTPException(status_code=400, detail="Invalid advisor ID")
 
     result = retrieve_context(body.query)
-    advisor_prompt = get_advisor_prompt(advisor_id)
+    advisor_prompt = get_advisor_prompt(resolved_id)
 
     chunks_payload = [
         {
@@ -79,13 +79,14 @@ def retrieve(
 
 @router.get("/prompts/{advisor_id}")
 def get_prompts(advisor_id: str, _: None = Depends(verify_service_secret)):
-    advisors = get_advisors()
-    if advisor_id not in advisors:
+    resolved_id = resolve_advisor_id(advisor_id)
+    if not resolved_id:
         raise HTTPException(status_code=400, detail="Invalid advisor ID")
+    advisors = get_advisors()
     return {
-        "advisor_id": advisor_id,
-        "name": advisors[advisor_id]["name"],
-        "prompt": get_advisor_prompt(advisor_id),
+        "advisor_id": resolved_id,
+        "name": advisors[resolved_id]["name"],
+        "prompt": get_advisor_prompt(resolved_id),
     }
 
 

@@ -257,7 +257,15 @@ export default function ChatInterface() {
       
       fetch("/api/advisors")
         .then(r => r.json())
-        .then(data => setAdvisorMap(data))
+        .then(data => {
+          setAdvisorMap(data);
+          const first = Object.keys(data)[0];
+          if (first) {
+            setEmptyAdvisorId((current) =>
+              current === "advisor1" && !data[current] ? first : current
+            );
+          }
+        })
         .catch(() => {});
       loadChats();
       fetch("/api/wakeup").catch(() => {});
@@ -868,6 +876,7 @@ export default function ChatInterface() {
             input={input}
             loading={loading}
             advisorId={emptyAdvisorId}
+            advisors={advisorMap}
             onAdvisorChange={setEmptyAdvisorId}
             onInputChange={handleInputChange}
             onSend={() => sendMessage()}

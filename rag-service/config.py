@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     google_service_account_json: str = ""
 
     doc_id_company_dna: str = ""
+    doc_id_advisor1: str = ""
+    doc_id_advisor2: str = ""
+    doc_id_advisor3: str = ""
 
     spreadsheet_id: str = ""
 

@@ -8,6 +8,7 @@ interface Props {
   input: string;
   loading: boolean;
   advisorId: string;
+  advisors: Record<string, { name: string; purpose?: string }>;
   onAdvisorChange: (id: string) => void;
   onInputChange: (value: string) => void;
   onSend: () => void;
@@ -21,6 +22,7 @@ export default function EmptyChatState({
   input,
   loading,
   advisorId,
+  advisors,
   onAdvisorChange,
   onInputChange,
   onSend,
@@ -30,7 +32,9 @@ export default function EmptyChatState({
   onSpeechToggle,
 }: Props) {
   const suggestions = getSuggestions(advisorId);
-  const advisorName = ADVISOR_NAMES[advisorId] ?? "EIF Advisor";
+  const advisorEntries = Object.entries(advisors);
+  const advisorName =
+    advisors[advisorId]?.name ?? ADVISOR_NAMES[advisorId] ?? "EIF Advisor";
 
   return (
     <div className="empty-chat-state">
@@ -42,7 +46,15 @@ export default function EmptyChatState({
         </p>
 
         <div className="advisor-pills">
-          {Object.entries(ADVISOR_NAMES).map(([id, name]) => (
+          {(advisorEntries.length > 0
+            ? advisorEntries
+            : Object.entries(ADVISOR_NAMES)
+          ).map(([id, nameOrEntry]) => {
+            const name =
+              typeof nameOrEntry === "string"
+                ? nameOrEntry
+                : nameOrEntry.name;
+            return (
             <button
               key={id}
               className={`advisor-pill ${id === advisorId ? "active" : ""}`}
@@ -51,7 +63,8 @@ export default function EmptyChatState({
             >
               {name}
             </button>
-          ))}
+            );
+          })}
         </div>
 
         {speechError && (
