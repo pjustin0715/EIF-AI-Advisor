@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { getAccessToken, isAdminUser } from "@/lib/auth-client";
+import AdminDashboardSkeleton from "@/components/AdminDashboardSkeleton";
 
 interface Advisor {
   id: string;
@@ -157,7 +158,7 @@ export default function AdminDashboard() {
     }
   };
 
-  if (!authorized || loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading Admin Dashboard...</div>;
+  if (!authorized || loading) return <AdminDashboardSkeleton />;
   if (error) return <div style={{ padding: 40, color: "red", textAlign: "center" }}>{error}</div>;
 
   return (
