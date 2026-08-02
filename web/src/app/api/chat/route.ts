@@ -37,53 +37,53 @@ async function acquireTurnLock(
   chatId: string,
   userEmail: string
 ): Promise<{ ok: true } | { ok: false; turn_lock: TurnLock }> {
-  const now = new Date();
-  const { data: current } = await supabase
-    .from("chats")
-    .select("turn_locked_by, turn_locked_until")
-    .eq("id", chatId)
-    .maybeSingle();
+  const nowIso = new Date().toISOString();
+  const expiry = turnLockExpiryIso();
 
-  const existing = buildTurnLock(
-    current?.turn_locked_by as string | null,
-    current?.turn_locked_until as string | null,
-    now
-  );
-
-  if (existing.active && existing.by !== userEmail) {
-    return { ok: false, turn_lock: existing };
-  }
-
-  const expiry = turnLockExpiryIso(now);
-  const { data: acquired } = await supabase
+  const { data: freeLock } = await supabase
     .from("chats")
     .update({
       turn_locked_by: userEmail,
       turn_locked_until: expiry,
     })
     .eq("id", chatId)
-    .or(
-      `turn_locked_until.is.null,turn_locked_until.lte.${now.toISOString()},turn_locked_by.eq.${userEmail}`
-    )
+    .or(`turn_locked_until.is.null,turn_locked_until.lte.${nowIso}`)
     .select("id")
     .maybeSingle();
 
-  if (!acquired) {
-    const { data: latest } = await supabase
-      .from("chats")
-      .select("turn_locked_by, turn_locked_until")
-      .eq("id", chatId)
-      .maybeSingle();
-    return {
-      ok: false,
-      turn_lock: buildTurnLock(
-        latest?.turn_locked_by as string | null,
-        latest?.turn_locked_until as string | null
-      ),
-    };
+  if (freeLock) {
+    return { ok: true };
   }
 
-  return { ok: true };
+  const { data: sameUserLock } = await supabase
+    .from("chats")
+    .update({
+      turn_locked_by: userEmail,
+      turn_locked_until: expiry,
+    })
+    .eq("id", chatId)
+    .eq("turn_locked_by", userEmail)
+    .gt("turn_locked_until", nowIso)
+    .select("id")
+    .maybeSingle();
+
+  if (sameUserLock) {
+    return { ok: true };
+  }
+
+  const { data: latest } = await supabase
+    .from("chats")
+    .select("turn_locked_by, turn_locked_until")
+    .eq("id", chatId)
+    .maybeSingle();
+
+  return {
+    ok: false,
+    turn_lock: buildTurnLock(
+      latest?.turn_locked_by as string | null,
+      latest?.turn_locked_until as string | null
+    ),
+  };
 }
 
 async function refreshTurnLock(

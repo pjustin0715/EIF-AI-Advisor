@@ -568,6 +568,34 @@ body {
   align-items: flex-start;
 }
 
+.message-author {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.shared-room-badge {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-left: 12px;
+}
+
+.shared-turn-banner {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  margin: 8px 0 16px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
 .message--ai {
   align-items: flex-start;
 }

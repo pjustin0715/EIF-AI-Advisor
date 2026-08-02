@@ -13,7 +13,8 @@ export function buildTurnLock(
 ): TurnLock {
   const until = lockedUntil ?? null;
   const active =
-    Boolean(lockedBy && until) && new Date(until).getTime() > now.getTime();
+    Boolean(lockedBy && until) &&
+    new Date(until as string).getTime() > now.getTime();
   return {
     by: lockedBy ?? null,
     until,

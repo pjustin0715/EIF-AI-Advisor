@@ -581,15 +581,78 @@ export default function ChatInterface({
     setChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, title } : c)));
   }
   async function handleShare(id: string) {
-    const res = await fetch("/api/share", { method: "POST", headers: authHeaders(), body: JSON.stringify({ chat_id: id }) });
+    const res = await fetch("/api/share", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ chat_id: id }),
+    });
     if (res.ok) {
       const { share_token } = await res.json();
       const url = `${window.location.origin}/share/${share_token}`;
-      setShareUrl(url);
+      const sharedAt = new Date().toISOString();
+      setShareDialog({ url, chatId: id, isShared: true });
+      setActiveChatMeta({
+        shared_at: sharedAt,
+        share_token,
+      });
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === id ? { ...c, shared_at: sharedAt, share_token } : c
+        )
+      );
       try {
         await navigator.clipboard.writeText(url);
       } catch {
-        // Ignore clipboard failures (e.g. document not focused); the share dialog still shows the URL to copy manually.
+        // Ignore clipboard failures
+      }
+    }
+  }
+
+  async function handleStopSharing() {
+    if (!shareDialog) return;
+    const res = await fetch("/api/share", {
+      method: "DELETE",
+      headers: authHeaders(),
+      body: JSON.stringify({ chat_id: shareDialog.chatId }),
+    });
+    if (res.ok) {
+      const chatId = shareDialog.chatId;
+      setShareDialog(null);
+      setActiveChatMeta((prev) =>
+        prev ? { ...prev, shared_at: null } : prev
+      );
+      setChats((prev) =>
+        prev.map((c) => (c.id === chatId ? { ...c, shared_at: null } : c))
+      );
+    }
+  }
+
+  async function handleRotateLink() {
+    if (!shareDialog) return;
+    const res = await fetch("/api/share", {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ chat_id: shareDialog.chatId }),
+    });
+    if (res.ok) {
+      const { share_token } = await res.json();
+      const url = `${window.location.origin}/share/${share_token}`;
+      setShareDialog((prev) =>
+        prev ? { ...prev, url, isShared: true } : prev
+      );
+      setActiveChatMeta((prev) =>
+        prev
+          ? {
+              ...prev,
+              share_token,
+              shared_at: prev.shared_at || new Date().toISOString(),
+            }
+          : prev
+      );
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        // Ignore clipboard failures
       }
     }
   }
@@ -706,21 +769,37 @@ export default function ChatInterface({
     setRetrievalRankingCount(null);
     setPendingQuery(text);
     setStreamingText("");
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    const senderEmail = getTokenPayload()?.sub ?? null;
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: text, author_email: senderEmail },
+    ]);
     const abort = new AbortController();
     abortRef.current = abort;
     let assistantText = "";
     let assistantRetrieval: RetrievalPayload | null = null;
     let assistantSuggestion: string | null = null;
+    const chatBody: Record<string, string> = { prompt: text, chat_id: chatId };
+    if (isSharedMode && shareToken) {
+      chatBody.share_token = shareToken;
+    } else if (activeChatMeta?.shared_at && activeChatMeta?.share_token) {
+      chatBody.share_token = activeChatMeta.share_token;
+    }
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ prompt: text, chat_id: chatId }),
+        body: JSON.stringify(chatBody),
         signal: abort.signal,
       });
       if (res.status === 401) {
         handleLogout();
+        return;
+      }
+      if (res.status === 409) {
+        const data = await res.json().catch(() => ({}));
+        if (data.turn_lock) setTurnLock(data.turn_lock);
+        setMessages((prev) => prev.slice(0, -1));
         return;
       }
       if (!res.ok || !res.body) {
@@ -812,7 +891,7 @@ export default function ChatInterface({
   async function sendMessage(overrideText?: string) {
     const fromInput = overrideText === undefined;
     const text = (overrideText ?? input).trim();
-    if (!text) return;
+    if (!text || remoteTurnActive) return;
 
     if (loadingRef.current) {
       const chatId =
@@ -845,6 +924,9 @@ export default function ChatInterface({
   }, [activeChatId]);
   const profilePicture = getProfilePicture();
   const userEmail = getTokenPayload()?.sub ?? null;
+  const remoteTurnActive =
+    Boolean(turnLock?.active && turnLock.by && turnLock.by !== userEmail) &&
+    !loading;
   const threadSuggestions = getSuggestions(activeAdvisorId);
   const activeQueue = activeChatId ? queues[activeChatId] || [] : [];
   return (
@@ -854,7 +936,8 @@ export default function ChatInterface({
           onLogin={() => {
             setIsAuthenticated(true);
             setIsAdmin(isAdminUser());
-            loadChats();
+            if (isSharedMode) loadSharedRoom();
+            else loadChats();
           }}
         />
       )}
@@ -901,24 +984,43 @@ export default function ChatInterface({
       </AlertDialog>
 
       <Dialog
-        open={shareUrl !== null}
+        open={shareDialog !== null}
         onOpenChange={(open) => {
-          if (!open) setShareUrl(null);
+          if (!open) setShareDialog(null);
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Link copied</DialogTitle>
+            <DialogTitle>Share live room</DialogTitle>
             <DialogDescription>
-              Your conversation snapshot link has been copied to your clipboard.
+              Anyone with this link can join and chat in this conversation.
             </DialogDescription>
           </DialogHeader>
-          {shareUrl && (
-            <Input readOnly value={shareUrl} onFocus={(e) => e.target.select()} />
+          {shareDialog && (
+            <Input
+              readOnly
+              value={shareDialog.url}
+              onFocus={(e) => e.target.select()}
+            />
           )}
-          <DialogFooter>
-            <Button type="button" onClick={() => setShareUrl(null)}>
-              OK
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleRotateLink()}
+            >
+              Rotate link
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="text-[var(--error)]"
+              onClick={() => void handleStopSharing()}
+            >
+              Stop sharing
+            </Button>
+            <Button type="button" onClick={() => setShareDialog(null)}>
+              Done
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -961,7 +1063,7 @@ export default function ChatInterface({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {isAuthenticated && sidebarOpen && (
+      {isAuthenticated && sidebarOpen && !isSharedMode && (
         <Sidebar
           chats={chats}
           loading={chatsLoading}
@@ -992,7 +1094,7 @@ export default function ChatInterface({
       <div className={`main-chat ${showEmptyState ? "main-chat--empty" : ""}`}>
         <div className="header">
           <div className="header-title">
-            {isAuthenticated && !sidebarOpen && (
+            {isAuthenticated && !sidebarOpen && !isSharedMode && (
               <button
                 className="sidebar-toggle-btn"
                 onClick={() => setSidebarOpen(true)}
@@ -1003,10 +1105,20 @@ export default function ChatInterface({
                 <PanelLeft className="h-4 w-4" />
               </button>
             )}
+            {isSharedMode && activeChatMeta?.title && (
+              <h1>{activeChatMeta.title}</h1>
+            )}
+            {isSharedMode && (
+              <span className="shared-room-badge">Live shared room</span>
+            )}
             {showEmptyState && <h1>EIF AI Advisor</h1>}
           </div>
         </div>
-        {chatsLoading ? (
+        {isSharedMode && sharedRoomError ? (
+          <div className="main-chat" style={{ justifyContent: "center", alignItems: "center", color: "var(--error)" }}>
+            {sharedRoomError}
+          </div>
+        ) : chatsLoading && !isSharedMode ? (
           <ChatSkeleton />
         ) : showEmptyState ? (
           <EmptyChatState
@@ -1027,7 +1139,9 @@ export default function ChatInterface({
             <div className="chat-messages" ref={chatboxRef}>
               <div className="chat-messages-inner">
                 {!isAuthenticated ? null : !activeChatId ? (
-                  <div className="empty-chat">Select or create a chat to begin.</div>
+                  <div className="empty-chat">
+                    {isSharedMode ? "Loading shared room…" : "Select or create a chat to begin."}
+                  </div>
                 ) : messagesLoading ? (
                   <ChatMessagesSkeleton />
                 ) : (
@@ -1085,6 +1199,14 @@ export default function ChatInterface({
                             )}
                           </div>
                           <div className="message-content">
+                            {msg.role === "user" &&
+                              (msg.author_email ||
+                                isSharedMode ||
+                                activeChatMeta?.shared_at) && (
+                                <span className="message-author">
+                                  {displayNameFromEmail(msg.author_email)}
+                                </span>
+                              )}
                             {msg.role !== "user" && (
                               <RetrievalPanel
                                 mode="finished"
@@ -1130,6 +1252,11 @@ export default function ChatInterface({
                       );
                     })}
                   </>
+                )}
+                {remoteTurnActive && (
+                  <div className="shared-turn-banner" role="status">
+                    {displayNameFromEmail(turnLock?.by)} is in this turn…
+                  </div>
                 )}
                 {loading && (
                   <div className="message message--ai">
@@ -1277,10 +1404,19 @@ export default function ChatInterface({
                   ref={inputRef}
                   type="text"
                   placeholder={
-                    loading ? "Queue a follow-up or steer..." : "Message..."
+                    remoteTurnActive
+                      ? "Waiting for current turn…"
+                      : loading
+                        ? "Queue a follow-up or steer..."
+                        : "Message..."
                   }
                   value={input}
-                  disabled={!isAuthenticated || !activeChatId || messagesLoading}
+                  disabled={
+                    !isAuthenticated ||
+                    !activeChatId ||
+                    messagesLoading ||
+                    remoteTurnActive
+                  }
                   onChange={(e) => handleInputChange(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
@@ -1356,7 +1492,13 @@ export default function ChatInterface({
                 ) : (
                   <button
                     className="send-btn"
-                    disabled={!isAuthenticated || !activeChatId || !input.trim() || messagesLoading}
+                    disabled={
+                      !isAuthenticated ||
+                      !activeChatId ||
+                      !input.trim() ||
+                      messagesLoading ||
+                      remoteTurnActive
+                    }
                     onClick={() => sendMessage()}
                     type="button"
                   >
