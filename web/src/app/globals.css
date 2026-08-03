@@ -1,34 +1,80 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
 
+/* Light mode (default) */
 :root {
-  --bg-color: #ffffff;
-  --sidebar-bg: #f9f9fb;
-  --sidebar-border: #e7eaee;
-  --primary: #3b0692;
-  --primary-hover: #4a0bb2;
-  --text-main: #222222;
-  --text-muted: #758696;
-  --text-secondary: #404040;
-  --error: #ea384c;
-  --item-hover: rgba(0, 0, 0, 0.04);
-  --item-active: rgba(59, 6, 146, 0.08);
-  --input-bg: #ffffff;
-  --input-border: #e7eaee;
+  --bg-color: hsl(0 0% 100%);
+  --sidebar-bg: hsl(240 13% 97%);
+  --sidebar-border: hsl(216 14% 93%);
+  --primary: hsl(273 95% 25%);
+  --primary-hover: hsl(272 95% 31%);
+  --primary-light: hsl(273 95% 82%);
+  --text-main: hsl(210 8% 13%);
+  --text-muted: hsl(218 13% 45%);
+  --text-secondary: hsl(0 0% 25%);
+  --error: hsl(0 86% 56%);
+  --item-hover: hsla(0 0% 0% / 0.04);
+  --item-active: hsla(273 95% 25% / 0.08);
+  --input-bg: hsl(0 0% 100%);
+  --input-border: hsl(216 14% 93%);
+  --accent: hsl(175 81% 45%);
 }
 
-* {
-  box-sizing: border-box;
+/* Dark mode */
+.dark {
+  --bg-color: hsl(222 84% 5%);
+  --sidebar-bg: hsl(225 21% 12%);
+  --sidebar-border: hsl(216 20% 25%);
+  --primary: hsl(273 91% 60%);
+  --primary-hover: hsl(273 91% 68%);
+  --primary-light: hsl(273 95% 82%);
+  --text-main: hsl(210 40% 98%);
+  --text-muted: hsl(216 15% 55%);
+  --text-secondary: hsl(0 0% 80%);
+  --error: hsl(0 86% 65%);
+  --item-hover: hsla(255 255% 255% / 0.08);
+  --item-active: hsla(273 91% 60% / 0.12);
+  --input-bg: hsl(225 21% 12%);
+  --input-border: hsl(216 20% 25%);
+  --accent: hsl(175 81% 50%);
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  background: var(--bg-color);
-  color: var(--text-main);
-  height: 100vh;
-  overflow: hidden;
+@theme inline {
+  --color-background: var(--bg-color);
+  --color-foreground: var(--text-main);
+  --color-primary: var(--primary);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--sidebar-bg);
+  --color-secondary-foreground: var(--text-main);
+  --color-destructive: var(--error);
+  --color-destructive-foreground: #ffffff;
+  --color-muted: var(--sidebar-bg);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--text-main);
+  --color-popover: var(--bg-color);
+  --color-popover-foreground: var(--text-main);
+  --color-card: var(--bg-color);
+  --color-card-foreground: var(--text-main);
+  --color-border: var(--sidebar-border);
+  --color-input: var(--input-border);
+  --color-ring: var(--primary);
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    height: 100vh;
+    overflow: hidden;
+    transition: background-color 0.2s, color 0.2s;
+  }
 }
 
 .app-container {
@@ -1771,4 +1817,55 @@ body {
 [role="alertdialog"] button {
   box-shadow: none !important;
   border-style: solid;
+}
+
+.mode-toggle-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--sidebar-border);
+}
+
+.mode-toggle-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+
+.mode-toggle-options {
+  display: flex;
+  gap: 4px;
+}
+
+.mode-toggle-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.mode-toggle-option:hover {
+  background: var(--item-hover);
+  color: var(--text-main);
+  border-color: var(--primary);
+}
+
+.mode-toggle-option.active {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  border-color: var(--primary);
+  font-weight: 600;
 }

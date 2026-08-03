@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import SidebarChatSkeleton from "./SidebarChatSkeleton";
+import { ModeToggle } from "./mode-toggle";
 
 interface Chat {
   id: string;
@@ -292,13 +293,20 @@ export default function Sidebar({
               <span className="sidebar-profile-name">{displayName}</span>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" side="top" sideOffset={8}>
+          <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-56">
             {isAdmin && (
-              <DropdownMenuItem onSelect={onAdminDashboard}>
-                <LayoutDashboard className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-                Admin Dashboard
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem onSelect={onAdminDashboard}>
+                  <LayoutDashboard className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                  Admin Dashboard
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
             )}
+            <div className="px-2 py-1.5">
+              <ModeToggle />
+            </div>
+            <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onSelect={onLogout}>
               <LogOut className="h-4 w-4 shrink-0" />
               Logout

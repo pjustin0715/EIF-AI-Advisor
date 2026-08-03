@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
+import { ThemeProvider } from "@/components/theme-provider";
 import ChatInterface from "@/components/ChatInterface";
 import "./globals.css";
 
@@ -17,13 +18,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <Script
-          src="https://accounts.google.com/gsi/client"
-          strategy="beforeInteractive"
-        />
-        {children}
+        <ThemeProvider defaultTheme="system" storageKey="advisor-theme">
+          <Script
+            src="https://accounts.google.com/gsi/client"
+            strategy="beforeInteractive"
+          />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
