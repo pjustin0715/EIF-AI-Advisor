@@ -142,4 +142,10 @@ cython_debug/
 # SpecStory (local chat history)
 .specstory/
 
+# Node.js / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
 # End of https://mrkandreev.name/snippets/gitignore-generator/#Python

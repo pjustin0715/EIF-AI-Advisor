@@ -39,6 +39,7 @@ interface Props {
   selectedIds: Set<string>;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  isNewChatActive?: boolean;
   onNewChat: () => void;
   onToggleSelectMode: () => void;
   onToggleSelect: (id: string) => void;
@@ -63,6 +64,7 @@ export default function Sidebar({
   selectedIds,
   onSelect,
   onDelete,
+  isNewChatActive = false,
   onNewChat,
   onToggleSelectMode,
   onToggleSelect,
@@ -209,9 +211,14 @@ export default function Sidebar({
       </div>
 
       <div className="sidebar-new">
-        <button className="new-chat-btn" onClick={onNewChat} title="New Chat" type="button">
+        <button
+          className={`new-chat-btn ${isNewChatActive ? "active" : ""}`}
+          onClick={onNewChat}
+          title="New chat"
+          type="button"
+        >
           <Plus className="h-4 w-4" />
-          <span>New</span>
+          <span>New chat</span>
         </button>
       </div>
 

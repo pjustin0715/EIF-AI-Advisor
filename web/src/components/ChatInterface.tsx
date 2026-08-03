@@ -56,7 +56,6 @@ import CopyMessageButton from "./CopyMessageButton";
 import EmptyChatState from "./EmptyChatState";
 import ContextMeter from "./ContextMeter";
 import LoginOverlay from "./LoginOverlay";
-import NewChatModal from "./NewChatModal";
 import RetrievalPanel from "./RetrievalPanel";
 import ChatMessagesSkeleton from "./ChatMessagesSkeleton";
 import ChatSkeleton from "./ChatSkeleton";
@@ -126,7 +125,6 @@ export default function ChatInterface({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
   const [activeAdvisorId, setActiveAdvisorId] = useState("advisor1");
   const [emptyAdvisorId, setEmptyAdvisorId] = useState("advisor1");
   const [advisorMap, setAdvisorMap] = useState<Record<string, { name: string, purpose?: string }>>({});
@@ -144,6 +142,7 @@ export default function ChatInterface({
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isHomeView, setIsHomeView] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
   const [shareDialog, setShareDialog] = useState<{
     url: string;
@@ -173,8 +172,12 @@ export default function ChatInterface({
   const loadingRef = useRef(false);
   const queuesRef = useRef<Record<string, QueuedPrompt[]>>({});
   const streamingChatIdRef = useRef<string | null>(null);
-  const showEmptyState =
-    !isSharedMode && isAuthenticated && !chatsLoading && chats.length === 0;
+  const isHomeViewRef = useRef(false);
+  const showWelcomeScreen =
+    !isSharedMode &&
+    isAuthenticated &&
+    !chatsLoading &&
+    (chats.length === 0 || isHomeView);
 
   function setLoadingFlag(value: boolean) {
     loadingRef.current = value;
@@ -316,7 +319,7 @@ export default function ChatInterface({
     if (res.ok) {
       const data = await res.json();
       setChats(data);
-      if (data.length > 0 && !activeChatIdRef.current) {
+      if (data.length > 0 && !activeChatIdRef.current && !isHomeViewRef.current) {
         setActiveChatId(data[0].id);
       }
     }
@@ -499,8 +502,21 @@ export default function ChatInterface({
       setCompacting(false);
     }
   }
+  function handleNewChat() {
+    if (selectMode) return;
+    setIsHomeView(true);
+    isHomeViewRef.current = true;
+    setActiveChatId(null);
+    activeChatIdRef.current = null;
+    setMessages([]);
+    setEditingTitle(false);
+    fetch("/api/wakeup").catch(() => {});
+  }
+
   function handleSelectChat(id: string) {
     if (selectMode) return;
+    setIsHomeView(false);
+    isHomeViewRef.current = false;
     setActiveChatId(id);
   }
   function handleToggleSelectMode() {
@@ -739,6 +755,8 @@ export default function ChatInterface({
     setMessages([]);
     setContextUsage(null);
     setContextSummary(null);
+    setIsHomeView(false);
+    isHomeViewRef.current = false;
     setActiveChatId(chat.id);
     activeChatIdRef.current = chat.id;
     setActiveAdvisorId(advisorId);
@@ -954,19 +972,6 @@ export default function ChatInterface({
           }}
         />
       )}
-      <NewChatModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onCreated={(id, advisorId) => {
-          loadChats();
-          skipLoadRef.current = true;
-          setMessages([]);
-          setContextUsage(null);
-          setContextSummary(null);
-          setActiveAdvisorId(advisorId);
-          setActiveChatId(id);
-        }}
-      />
       <AlertDialog
         open={pendingDelete !== null}
         onOpenChange={(open) => {
@@ -1085,10 +1090,8 @@ export default function ChatInterface({
           selectedIds={selectedIds}
           onSelect={handleSelectChat}
           onDelete={handleDeleteChat}
-          onNewChat={() => {
-            setModalOpen(true);
-            fetch("/api/wakeup").catch(() => {});
-          }}
+          isNewChatActive={showWelcomeScreen}
+          onNewChat={handleNewChat}
           onToggleSelectMode={handleToggleSelectMode}
           onToggleSelect={handleToggleSelect}
           onSelectAll={handleSelectAll}
@@ -1104,7 +1107,7 @@ export default function ChatInterface({
           onLogout={handleLogout}
         />
       )}
-      <div className={`main-chat ${showEmptyState ? "main-chat--empty" : ""}`}>
+      <div className={`main-chat ${showWelcomeScreen ? "main-chat--empty" : ""}`}>
         <div className="header">
           <div className="header-title">
             {isAuthenticated && !sidebarOpen && !isSharedMode && (
@@ -1124,7 +1127,7 @@ export default function ChatInterface({
             {isSharedMode && (
               <span className="shared-room-badge">Live shared room</span>
             )}
-            {!isSharedMode && !showEmptyState && activeChatId && (
+            {!isSharedMode && !showWelcomeScreen && activeChatId && (
               editingTitle ? (
                 <input
                   autoFocus
@@ -1153,7 +1156,7 @@ export default function ChatInterface({
                 </button>
               )
             )}
-            {showEmptyState && <h1>EIF AI Advisor</h1>}
+            {showWelcomeScreen && <h1>EIF AI Advisor</h1>}
           </div>
         </div>
         {isSharedMode && sharedRoomError ? (
@@ -1162,7 +1165,7 @@ export default function ChatInterface({
           </div>
         ) : chatsLoading && !isSharedMode ? (
           <ChatSkeleton />
-        ) : showEmptyState ? (
+        ) : showWelcomeScreen ? (
           <EmptyChatState
             input={input}
             loading={loading}
@@ -1225,31 +1228,49 @@ export default function ChatInterface({
                           key={idx}
                           className={`message ${msg.role === "user" ? "message--user" : "message--ai"}`}
                         >
-                          <div className={`avatar ${msg.role === "user" ? "user" : "ai"}`}>
-                            {msg.role === "user" ? (
-                              profilePicture ? (
-                                <img src={profilePicture} alt="User" className="avatar-img" />
-                              ) : (
-                                "U"
-                              )
-                            ) : (
-                              <img
-                                src="/eskwelabs-logo.png"
-                                alt="Eskwelabs AI"
-                                className="avatar-img"
-                              />
-                            )}
-                          </div>
-                          <div className="message-content">
-                            {msg.role === "user" &&
-                              (msg.author_email ||
-                                isSharedMode ||
-                                activeChatMeta?.shared_at) && (
-                                <span className="message-author">
-                                  {displayNameFromEmail(msg.author_email)}
-                                </span>
-                              )}
-                            {msg.role !== "user" && (
+                          {msg.role === "user" ? (
+                            <div className="message-user-column">
+                              <div className="message-user-header">
+                                {(msg.author_email ||
+                                  isSharedMode ||
+                                  activeChatMeta?.shared_at) && (
+                                  <span className="message-author">
+                                    {displayNameFromEmail(msg.author_email)}
+                                  </span>
+                                )}
+                                <div className="avatar user">
+                                  {profilePicture ? (
+                                    <img
+                                      src={profilePicture}
+                                      alt="User"
+                                      className="avatar-img"
+                                    />
+                                  ) : (
+                                    "U"
+                                  )}
+                                </div>
+                              </div>
+                              <div className="message-content">
+                                <div
+                                  dangerouslySetInnerHTML={{
+                                    __html: marked.parse(
+                                      extractNextQuestion(msg.content || "").body
+                                    ),
+                                  }}
+                                />
+                                <CopyMessageButton text={msg.content || ""} />
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="avatar ai">
+                                <img
+                                  src="/eskwelabs-logo.png"
+                                  alt="Eskwelabs AI"
+                                  className="avatar-img"
+                                />
+                              </div>
+                              <div className="message-content">
                               <RetrievalPanel
                                 mode="finished"
                                 retrieval={normalizeCitations(msg.citations)}
@@ -1262,8 +1283,7 @@ export default function ChatInterface({
                                   null
                                 }
                               />
-                            )}
-                            <div
+                              <div
                               dangerouslySetInnerHTML={{
                                 __html: marked.parse(
                                   extractNextQuestion(msg.content || "").body
@@ -1271,11 +1291,7 @@ export default function ChatInterface({
                               }}
                             />
                             <CopyMessageButton
-                              text={
-                                msg.role === "user"
-                                  ? msg.content || ""
-                                  : extractNextQuestion(msg.content || "").body
-                              }
+                              text={extractNextQuestion(msg.content || "").body}
                             />
                             {isLatestAi && msg.suggestion && (
                               <SuggestionChips
@@ -1290,6 +1306,8 @@ export default function ChatInterface({
                               />
                             )}
                           </div>
+                            </>
+                          )}
                         </div>
                       );
                     })}
