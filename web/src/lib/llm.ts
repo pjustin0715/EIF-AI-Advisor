@@ -59,4 +59,80 @@ export function getOpenRouterClient() {
   });
 }
 
+const RATE_LIMIT_RETRIES = 3;
+const RATE_LIMIT_BASE_MS = 2000;
+
+export function isRateLimitError(err: unknown): boolean {
+  if (err && typeof err === "object") {
+    const e = err as { status?: number; message?: string };
+    if (e.status === 429) return true;
+    if (typeof e.message === "string" && /429|rate.?limit/i.test(e.message)) {
+      return true;
+    }
+  }
+  if (err instanceof Error && /429|rate.?limit/i.test(err.message)) {
+    return true;
+  }
+  return false;
+}
+
+export function formatLlmError(err: unknown): string {
+  if (isRateLimitError(err)) {
+    return "Rate limit reached — wait a moment and try again.";
+  }
+  if (err instanceof Error) return err.message;
+  return "Generation failed";
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      const err = new Error("Aborted");
+      err.name = "AbortError";
+      reject(err);
+      return;
+    }
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        const err = new Error("Aborted");
+        err.name = "AbortError";
+        reject(err);
+      },
+      { once: true }
+    );
+  });
+}
+
+/** Retry LLM calls with exponential backoff when the provider returns 429. */
+export async function withRateLimitRetry<T>(
+  fn: () => Promise<T>,
+  opts?: { signal?: AbortSignal; maxRetries?: number }
+): Promise<T> {
+  const maxRetries = opts?.maxRetries ?? RATE_LIMIT_RETRIES;
+  let lastErr: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (opts?.signal?.aborted) {
+      const err = new Error("Aborted");
+      err.name = "AbortError";
+      throw err;
+    }
+
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isRateLimitError(err) || attempt === maxRetries) {
+        throw err;
+      }
+      await sleep(RATE_LIMIT_BASE_MS * 2 ** attempt, opts?.signal);
+    }
+  }
+
+  throw lastErr;
+}
+
 export { MODEL };

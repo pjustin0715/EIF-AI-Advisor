@@ -1,5 +1,10 @@
 import { titleFromPrompt } from "./drafts";
-import { getOpenRouterClient, MODEL, resolveModel } from "./llm";
+import {
+  getOpenRouterClient,
+  MODEL,
+  resolveModel,
+  withRateLimitRetry,
+} from "./llm";
 
 const ADVISOR_LABELS: Record<string, string> = {
   advisor1: "Data Dashboard Advisor",
@@ -28,26 +33,28 @@ export async function generateChatTitle(
 
   try {
     const openai = getOpenRouterClient();
-    const response = await openai.chat.completions.create({
-      model: titleModel(),
-      temperature: 0.2,
-      max_tokens: 24,
-      messages: [
-        {
-          role: "system",
-          content:
-            `Write a short chat title (3-6 words) summarizing this EIF mentoring exchange. ` +
-            `Use both the user's question and the advisor's reply. ` +
-            `No quotes, no ending punctuation. Advisor context: ${advisorLabel}.`,
-        },
-        {
-          role: "user",
-          content:
-            `User question:\n${userMessage.slice(0, 400)}\n\n` +
-            `Advisor reply:\n${assistantReply.slice(0, 600)}`,
-        },
-      ],
-    });
+    const response = await withRateLimitRetry(() =>
+      openai.chat.completions.create({
+        model: titleModel(),
+        temperature: 0.2,
+        max_tokens: 24,
+        messages: [
+          {
+            role: "system",
+            content:
+              `Write a short chat title (3-6 words) summarizing this EIF mentoring exchange. ` +
+              `Use both the user's question and the advisor's reply. ` +
+              `No quotes, no ending punctuation. Advisor context: ${advisorLabel}.`,
+          },
+          {
+            role: "user",
+            content:
+              `User question:\n${userMessage.slice(0, 400)}\n\n` +
+              `Advisor reply:\n${assistantReply.slice(0, 600)}`,
+          },
+        ],
+      })
+    );
 
     const raw = response.choices[0]?.message?.content?.trim() || "";
     const cleaned = raw

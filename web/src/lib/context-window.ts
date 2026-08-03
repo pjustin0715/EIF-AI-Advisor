@@ -1,4 +1,9 @@
-import { estimateTokens, getOpenRouterClient, MODEL } from "@/lib/llm";
+import {
+  estimateTokens,
+  getOpenRouterClient,
+  MODEL,
+  withRateLimitRetry,
+} from "@/lib/llm";
 import {
   DEFAULT_CONTEXT_WINDOW_TOKENS,
   DEFAULT_OUTPUT_RESERVE_TOKENS,
@@ -158,28 +163,30 @@ export async function summarizeForCompact(
     .slice(0, 120_000);
 
   const openai = getOpenRouterClient();
-  const response = await openai.chat.completions.create({
-    model: MODEL,
-    temperature: 0.2,
-    max_tokens: 1200,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You compress chat history for an advisory AI. Produce a dense factual summary that preserves: user goals, decisions, constraints, key facts, open questions, and advisor recommendations. Omit fluff. Use short bullet points. No preamble.",
-      },
-      {
-        role: "user",
-        content: [
-          existingSummary?.trim()
-            ? `Existing summary to merge/update:\n${existingSummary.trim()}\n\n`
-            : "",
-          `Conversation turns to compact:\n${transcript}`,
-          "\n\nWrite the updated summary:",
-        ].join(""),
-      },
-    ],
-  });
+  const response = await withRateLimitRetry(() =>
+    openai.chat.completions.create({
+      model: MODEL,
+      temperature: 0.2,
+      max_tokens: 1200,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You compress chat history for an advisory AI. Produce a dense factual summary that preserves: user goals, decisions, constraints, key facts, open questions, and advisor recommendations. Omit fluff. Use short bullet points. No preamble.",
+        },
+        {
+          role: "user",
+          content: [
+            existingSummary?.trim()
+              ? `Existing summary to merge/update:\n${existingSummary.trim()}\n\n`
+              : "",
+            `Conversation turns to compact:\n${transcript}`,
+            "\n\nWrite the updated summary:",
+          ].join(""),
+        },
+      ],
+    })
+  );
 
   const text = response.choices[0]?.message?.content?.trim();
   if (!text) {

@@ -11,9 +11,11 @@ import {
 import {
   estimateCost,
   estimateTokens,
+  formatLlmError,
   getOpenRouterClient,
   MODEL,
   resolveModel,
+  withRateLimitRetry,
 } from "@/lib/llm";
 import { isDefaultChatTitle } from "@/lib/drafts";
 import { generateChatTitle } from "@/lib/generate-title";
@@ -333,15 +335,19 @@ export async function POST(req: NextRequest) {
         send({ type: "context", ...contextUsage });
 
         const openai = getOpenRouterClient();
-        const response = await openai.chat.completions.create(
-          {
-            model: targetModel,
-            messages: [
-              { role: "system", content: systemPrompt },
-              ...openAIHistory,
-            ],
-            stream: true,
-          },
+        const response = await withRateLimitRetry(
+          () =>
+            openai.chat.completions.create(
+              {
+                model: targetModel,
+                messages: [
+                  { role: "system", content: systemPrompt },
+                  ...openAIHistory,
+                ],
+                stream: true,
+              },
+              { signal: req.signal }
+            ),
           { signal: req.signal }
         );
 
@@ -455,8 +461,7 @@ export async function POST(req: NextRequest) {
             retrieved_chunk_ids: retrievedChunkIds,
           });
         } else {
-          const message =
-            err instanceof Error ? err.message : "Generation failed";
+          const message = formatLlmError(err);
           send({ type: "error", message });
           await supabase.from("turn_logs").insert({
             conversation_id: chat_id,
