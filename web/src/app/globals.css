@@ -958,8 +958,6 @@
   z-index: 1;
   width: 100%;
   box-sizing: border-box;
-  max-height: 60vh;
-  overflow-y: auto;
   margin-top: 8px;
   padding: 10px 14px 14px;
   border: 1px solid var(--sidebar-border);
