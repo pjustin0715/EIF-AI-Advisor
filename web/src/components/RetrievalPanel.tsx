@@ -381,7 +381,15 @@ export default function RetrievalPanel({
         type="button"
         className="retrieval-panel__summary"
         aria-expanded={finishedOpen}
-        onClick={() => setFinishedOpen((open) => !open)}
+        onClick={() => {
+          setFinishedOpen((open) => {
+            const next = !open;
+            if (next && !expandedStep) {
+              setExpandedStep("ranking");
+            }
+            return next;
+          });
+        }}
       >
         <IconChevron open={finishedOpen} />
         <span>{summary}</span>
@@ -390,7 +398,7 @@ export default function RetrievalPanel({
         <div className="retrieval-panel__body">
           <Timeline className="retrieval-timeline--finished">
             {STEP_ORDER.filter((step) => step === "ranking").map((step) => {
-              const isExpanded = expandedStep === step;
+              const isExpanded = expandedStep === step || expandedStep === null;
               let label = STEP_LABELS[step];
               return (
                 <TimelineStep

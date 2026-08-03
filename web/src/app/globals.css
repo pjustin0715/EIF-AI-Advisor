@@ -903,11 +903,13 @@
 
 .retrieval-panel--finished {
   position: relative;
-  display: inline-block;
+  display: block;
+  width: 100%;
   border: none;
-  border-radius: 999px;
+  border-radius: 12px;
   background: transparent;
   overflow: visible;
+  margin-bottom: 12px;
 }
 
 .retrieval-panel__summary {
@@ -950,20 +952,20 @@
 }
 
 .retrieval-panel__body {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 30;
-  width: max-content;
-  min-width: 320px;
-  max-width: min(420px, 80vw);
+  position: relative;
+  top: auto;
+  left: auto;
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
   max-height: 60vh;
   overflow-y: auto;
-  padding: 8px 12px 12px;
+  margin-top: 8px;
+  padding: 10px 14px 14px;
   border: 1px solid var(--sidebar-border);
   border-radius: 12px;
   background: var(--retrieval-panel-bg);
-  box-shadow: var(--elevated-shadow);
+  box-shadow: none;
 }
 
 .retrieval-timeline {
