@@ -8,7 +8,7 @@ export function ModeToggle() {
 
   return (
     <div className="mode-toggle-container">
-      <div className="mode-toggle-label">Theme</div>
+      <span className="mode-toggle-label">Theme</span>
       <div className="mode-toggle-options">
         <button
           className={`mode-toggle-option ${theme === "light" ? "active" : ""}`}

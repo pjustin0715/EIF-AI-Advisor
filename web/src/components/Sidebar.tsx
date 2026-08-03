@@ -303,9 +303,7 @@ export default function Sidebar({
                 <DropdownMenuSeparator />
               </>
             )}
-            <div className="px-2 py-1.5">
-              <ModeToggle />
-            </div>
+            <ModeToggle />
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onSelect={onLogout}>
               <LogOut className="h-4 w-4 shrink-0" />

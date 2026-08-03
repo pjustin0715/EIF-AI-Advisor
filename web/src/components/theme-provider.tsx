@@ -38,7 +38,7 @@ export function ThemeProvider({
   useEffect(() => {
     if (!mounted) return;
 
-    let actualTheme = theme;
+    let actualTheme: "light" | "dark" = theme === "dark" ? "dark" : "light";
 
     if (theme === "system") {
       actualTheme = window.matchMedia("(prefers-color-scheme: dark)").matches

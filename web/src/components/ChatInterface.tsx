@@ -695,35 +695,6 @@ export default function ChatInterface({
     abortRef.current?.abort();
   }
 
-  function steerWithText(chatId: string, text: string) {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    clearChatQueue(chatId);
-    if (loadingRef.current) {
-      enqueuePrompt(chatId, trimmed);
-      discardPartialStream();
-      abortRef.current?.abort();
-      return;
-    }
-    void startTurn(chatId, trimmed, { clearInput: false });
-  }
-
-  function steerMessage() {
-    const text = input.trim();
-    if (!text || !loadingRef.current) return;
-    const chatId = streamingChatIdRef.current || activeChatId;
-    if (!chatId) return;
-    setInput("");
-    clearDraft(chatId);
-    steerWithText(chatId, text);
-  }
-
-  function steerQueuedPrompt(chatId: string, id: string) {
-    const item = (queuesRef.current[chatId] || []).find((q) => q.id === id);
-    if (!item) return;
-    steerWithText(chatId, item.text);
-  }
-
   async function createChat(advisorId: string): Promise<string | null> {
     const res = await fetch("/api/chats", {
       method: "POST",
@@ -1366,19 +1337,6 @@ export default function ChatInterface({
                           </button>
                           <button
                             type="button"
-                            className="prompt-queue-action prompt-queue-steer"
-                            onClick={() =>
-                              steerQueuedPrompt(activeChatId, item.id)
-                            }
-                            title="Steer with this prompt now"
-                            aria-label="Steer with this prompt now"
-                          >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                              <path d="M3 20V4L22 12L3 20ZM5 17L16.85 12L5 7V10.5L11 12L5 13.5V17Z" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
                             className="prompt-queue-action prompt-queue-remove"
                             onClick={() =>
                               removeQueueItem(activeChatId, item.id)
@@ -1407,7 +1365,7 @@ export default function ChatInterface({
                     remoteTurnActive
                       ? "Waiting for current turn…"
                       : loading
-                        ? "Queue a follow-up or steer..."
+                        ? "Queue a follow-up..."
                         : "Message..."
                   }
                   value={input}
@@ -1456,54 +1414,32 @@ export default function ChatInterface({
                   onClick={toggleSpeech}
                   disabled={!isAuthenticated || !activeChatId || messagesLoading}
                 />
-                {loading ? (
-                  <>
-                    <button
-                      onClick={steerMessage}
-                      type="button"
-                      className="send-btn steer-btn"
-                      disabled={!input.trim()}
-                      title="Steer: abort and redirect"
-                    >
-                      Steer
-                    </button>
-                    <button
-                      onClick={() => sendMessage()}
-                      type="button"
-                      className="send-btn"
-                      disabled={!input.trim()}
-                      title="Add to queue"
-                    >
-                      <svg viewBox="0 0 24 24">
-                        <path d="M3 20V4L22 12L3 20ZM5 17L16.85 12L5 7V10.5L11 12L5 13.5V17Z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={stopStreaming}
-                      type="button"
-                      className="send-btn stop-btn"
-                      title="Stop generation"
-                    >
-                      <svg viewBox="0 0 24 24">
-                        <rect x="6" y="6" width="12" height="12" />
-                      </svg>
-                    </button>
-                  </>
-                ) : (
+                <button
+                  className="send-btn"
+                  disabled={
+                    !isAuthenticated ||
+                    !activeChatId ||
+                    !input.trim() ||
+                    messagesLoading ||
+                    remoteTurnActive
+                  }
+                  onClick={() => sendMessage()}
+                  type="button"
+                  title={loading ? "Add to queue" : "Send message"}
+                >
+                  <svg viewBox="0 0 24 24">
+                    <path d="M3 20V4L22 12L3 20ZM5 17L16.85 12L5 7V10.5L11 12L5 13.5V17Z" />
+                  </svg>
+                </button>
+                {loading && (
                   <button
-                    className="send-btn"
-                    disabled={
-                      !isAuthenticated ||
-                      !activeChatId ||
-                      !input.trim() ||
-                      messagesLoading ||
-                      remoteTurnActive
-                    }
-                    onClick={() => sendMessage()}
+                    onClick={stopStreaming}
                     type="button"
+                    className="send-btn stop-btn"
+                    title="Stop generation"
                   >
                     <svg viewBox="0 0 24 24">
-                      <path d="M3 20V4L22 12L3 20ZM5 17L16.85 12L5 7V10.5L11 12L5 13.5V17Z" />
+                      <rect x="6" y="6" width="12" height="12" />
                     </svg>
                   </button>
                 )}

@@ -137,7 +137,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Chat not found" }, { status: 404 });
   }
 
-  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const updates: Record<string, unknown> = {};
   if (title !== undefined) updates.title = title;
   if (pinned !== undefined) updates.pinned = pinned;
 

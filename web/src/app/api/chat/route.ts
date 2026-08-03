@@ -297,7 +297,7 @@ export async function POST(req: NextRequest) {
 
         const { error: updateError } = await supabase
           .from("chats")
-          .update({ title: newTitle, updated_at: new Date().toISOString() })
+          .update({ title: newTitle })
           .eq("id", chat_id);
         if (updateError) {
           console.error("Failed to update chat title:", updateError);

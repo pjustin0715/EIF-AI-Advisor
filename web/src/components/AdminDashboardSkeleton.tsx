@@ -17,7 +17,7 @@ export default function AdminDashboardSkeleton() {
 
         <div className="mb-10">
           <Skeleton className="mb-4 h-6 w-44" />
-          <div className="rounded-xl border border-[var(--sidebar-border)] bg-white p-5">
+          <div className="rounded-xl border border-[var(--sidebar-border)] bg-[var(--surface-elevated)] p-5">
             <Skeleton className="mb-5 h-4 w-full max-w-xl" />
             <div className="mb-6 flex flex-col gap-4">
               {[0, 1].map((i) => (
@@ -45,7 +45,7 @@ export default function AdminDashboardSkeleton() {
 
         <div>
           <Skeleton className="mb-4 h-6 w-48" />
-          <div className="overflow-hidden rounded-xl border border-[var(--sidebar-border)] bg-white">
+          <div className="overflow-hidden rounded-xl border border-[var(--sidebar-border)] bg-[var(--surface-elevated)]">
             <div className="border-b border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] px-6 py-4">
               <div className="flex gap-6">
                 {[0, 1, 2, 3].map((i) => (
