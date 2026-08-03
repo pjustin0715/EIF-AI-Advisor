@@ -116,6 +116,7 @@ export default function ChatInterface({
   shareToken?: string;
 } = {}) {
   const isSharedMode = mode === "shared";
+  const [authReady, setAuthReady] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [chatsLoading, setChatsLoading] = useState(true);
@@ -365,6 +366,7 @@ export default function ChatInterface({
       setChatsLoading(false);
       if (isSharedMode) setMessagesLoading(false);
     }
+    setAuthReady(true);
   }, [loadChats, loadSharedRoom, isSharedMode]);
   // Restore draft when switching chats
   useEffect(() => {
@@ -974,7 +976,7 @@ export default function ChatInterface({
   const activeQueue = activeChatId ? queues[activeChatId] || [] : [];
   return (
     <div className="app-container">
-      {!isAuthenticated && (
+      {authReady && !isAuthenticated && (
         <LoginOverlay
           onLogin={() => {
             setIsAuthenticated(true);
@@ -1171,7 +1173,9 @@ export default function ChatInterface({
             {showWelcomeScreen && <h1>EIF AI Advisor</h1>}
           </div>
         </div>
-        {isSharedMode && sharedRoomError ? (
+        {!authReady ? (
+          <ChatSkeleton />
+        ) : isSharedMode && sharedRoomError ? (
           <div className="main-chat" style={{ justifyContent: "center", alignItems: "center", color: "var(--error)" }}>
             {sharedRoomError}
           </div>
