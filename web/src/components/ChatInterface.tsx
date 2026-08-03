@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PanelLeft } from "lucide-react";
+import { PanelLeft, ArrowDown } from "lucide-react";
 import { marked } from "marked";
 import {
   authHeaders,
@@ -247,10 +247,22 @@ export default function ChatInterface({
     setRetrievalRankingCount(null);
     setPendingQuery(null);
   }
-  const scrollToBottom = useCallback(() => {
-    if (chatboxRef.current) {
-      chatboxRef.current.scrollTop = chatboxRef.current.scrollHeight;
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const scrollToBottom = useCallback((smooth = false) => {
+    const el = chatboxRef.current;
+    if (!el) return;
+    if (smooth) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    } else {
+      el.scrollTop = el.scrollHeight;
     }
+  }, []);
+  const handleChatScroll = useCallback(() => {
+    const el = chatboxRef.current;
+    if (!el) return;
+    const distanceFromBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollToBottom(distanceFromBottom > 160);
   }, []);
   const loadSharedRoom = useCallback(async () => {
     if (!shareToken) return;
@@ -1181,7 +1193,11 @@ export default function ChatInterface({
           />
         ) : (
           <>
-            <div className="chat-messages" ref={chatboxRef}>
+            <div
+              className="chat-messages"
+              ref={chatboxRef}
+              onScroll={handleChatScroll}
+            >
               <div className="chat-messages-inner">
                 {!isAuthenticated ? null : !activeChatId ? (
                   <div className="empty-chat">
@@ -1352,6 +1368,17 @@ export default function ChatInterface({
                 )}
               </div>
             </div>
+            {showScrollToBottom && (
+              <button
+                type="button"
+                className="scroll-to-bottom-btn"
+                onClick={() => scrollToBottom(true)}
+                aria-label="Scroll to bottom"
+                title="Scroll to bottom"
+              >
+                <ArrowDown size={16} />
+              </button>
+            )}
             <div className="input-container">
               {activeChatId && activeQueue.length > 0 && (
                 <div className="prompt-queue" aria-label="Queued prompts">
