@@ -87,6 +87,16 @@ function IconChevron({ open }: { open: boolean }) {
   );
 }
 
+function LoadingDots() {
+  return (
+    <span className="retrieval-loading-dots" aria-hidden="true">
+      <span />
+      <span />
+      <span />
+    </span>
+  );
+}
+
 function stepIcon(step: RetrievalStatusStep, done: boolean): ReactNode {
   if (done && step === "ready") return <IconCheck />;
   if (step === "searching") return <IconSearch />;
@@ -144,12 +154,14 @@ function StepContext({
   query,
   isAdmin,
   rankingCount,
+  active = false,
 }: {
   step: RetrievalStatusStep;
   retrieval?: RetrievalPayload | null;
   query?: string | null;
   isAdmin: boolean;
   rankingCount?: number | null;
+  active?: boolean;
 }) {
   const sources = retrieval?.sources ?? [];
   const count =
@@ -161,6 +173,7 @@ function StepContext({
         <p className="retrieval-step__prose">
           Looking up DNA sections related to your question
           {query?.trim() ? ":" : "."}
+          {active && <LoadingDots />}
         </p>
         {query?.trim() && (
           <p className="retrieval-step__query">{query.trim()}</p>
@@ -173,7 +186,10 @@ function StepContext({
     if (!retrieval) {
       return (
         <div className="retrieval-step__context">
-          <p className="retrieval-step__empty">Waiting for ranked DNA matches…</p>
+          <p className="retrieval-step__empty">
+            Waiting for ranked DNA matches…
+            {active && <LoadingDots />}
+          </p>
         </div>
       );
     }
@@ -191,7 +207,10 @@ function StepContext({
   if (!retrieval) {
     return (
       <div className="retrieval-step__context">
-        <p className="retrieval-step__empty">Preparing answer context…</p>
+        <p className="retrieval-step__empty">
+          Preparing answer context…
+          {active && <LoadingDots />}
+        </p>
       </div>
     );
   }
@@ -357,6 +376,7 @@ export default function RetrievalPanel({
                   query={query}
                   isAdmin={isAdmin}
                   rankingCount={rankingCount}
+                  active={active}
                 />
               </TimelineStep>
             );
