@@ -1229,27 +1229,7 @@ export default function ChatInterface({
                           className={`message ${msg.role === "user" ? "message--user" : "message--ai"}`}
                         >
                           {msg.role === "user" ? (
-                            <div className="message-user-column">
-                              <div className="message-user-header">
-                                {(msg.author_email ||
-                                  isSharedMode ||
-                                  activeChatMeta?.shared_at) && (
-                                  <span className="message-author">
-                                    {displayNameFromEmail(msg.author_email)}
-                                  </span>
-                                )}
-                                <div className="avatar user">
-                                  {profilePicture ? (
-                                    <img
-                                      src={profilePicture}
-                                      alt="User"
-                                      className="avatar-img"
-                                    />
-                                  ) : (
-                                    "U"
-                                  )}
-                                </div>
-                              </div>
+                            <>
                               <div className="message-content">
                                 <div
                                   dangerouslySetInnerHTML={{
@@ -1260,7 +1240,18 @@ export default function ChatInterface({
                                 />
                                 <CopyMessageButton text={msg.content || ""} />
                               </div>
-                            </div>
+                              <div className="avatar user">
+                                {profilePicture ? (
+                                  <img
+                                    src={profilePicture}
+                                    alt="User"
+                                    className="avatar-img"
+                                  />
+                                ) : (
+                                  "U"
+                                )}
+                              </div>
+                            </>
                           ) : (
                             <>
                               <div className="avatar ai">

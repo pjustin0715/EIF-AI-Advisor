@@ -684,25 +684,11 @@
   align-self: flex-end;
   max-width: min(85%, 100%);
   margin-left: auto;
-}
-
-.message-user-column {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.message-user-header {
-  display: flex;
-  flex-direction: row-reverse;
-  align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
 }
 
 .message--user .message-content {
+  position: relative;
   flex-grow: 0;
   width: fit-content;
   max-width: 100%;
@@ -710,11 +696,6 @@
   padding: 10px 16px;
   border-radius: 18px 18px 4px 18px;
   text-align: left;
-}
-
-.message--user .message-author {
-  text-align: right;
-  margin-bottom: 0;
 }
 
 .message-author {
@@ -807,6 +788,12 @@
   margin-top: 0;
 }
 
+.message-content > div > p:last-child,
+.message-content > p:last-child,
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
 .message-content code {
   background: var(--code-bg);
   padding: 2px 6px;
@@ -816,7 +803,9 @@
 .message-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 6px;
+  margin-top: 0;
+  height: 0;
+  overflow: visible;
   opacity: 0;
   transition: opacity 0.15s ease;
 }
@@ -824,6 +813,14 @@
 .message:hover .message-actions,
 .message:focus-within .message-actions {
   opacity: 1;
+}
+
+.message--user .message-actions {
+  position: absolute;
+  bottom: 2px;
+  right: 6px;
+  margin-top: 0;
+  height: auto;
 }
 
 .copy-message-btn {
