@@ -159,6 +159,8 @@ export default function ChatInterface({
   const [sharedRoomError, setSharedRoomError] = useState("");
   const [renameTarget, setRenameTarget] = useState<{ id: string; title: string } | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
   const [contextUsage, setContextUsage] = useState<ContextUsage | null>(null);
   const [contextSummary, setContextSummary] = useState<string | null>(null);
   const [compacting, setCompacting] = useState(false);
@@ -677,6 +679,25 @@ export default function ChatInterface({
     setRenameValue(chat?.title || "");
   }
 
+  function startTitleEdit(id: string) {
+    const chat = chats.find((c) => c.id === id);
+    setTitleDraft(chat?.title || "");
+    setEditingTitle(true);
+  }
+
+  async function saveTitleEdit(id: string) {
+    const newTitle = titleDraft.trim();
+    setEditingTitle(false);
+    const current = chats.find((c) => c.id === id)?.title || "";
+    if (!newTitle || newTitle === current) return;
+    const res = await fetch(`/api/chats/${id}`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: newTitle }),
+    });
+    if (res.ok) updateChatTitle(id, newTitle);
+  }
+
   async function confirmRename() {
     if (!renameTarget) return;
     const newTitle = renameValue.trim();
@@ -693,6 +714,17 @@ export default function ChatInterface({
   function stopStreaming() {
     discardPartialStream();
     abortRef.current?.abort();
+  }
+
+  function steerNextQueued(chatId: string) {
+    const list = queuesRef.current[chatId] || [];
+    if (list.length === 0) return;
+    if (loadingRef.current) {
+      discardPartialStream();
+      abortRef.current?.abort();
+    } else {
+      void drainQueue(chatId);
+    }
   }
 
   async function createChat(advisorId: string): Promise<string | null> {
@@ -862,12 +894,20 @@ export default function ChatInterface({
   async function sendMessage(overrideText?: string) {
     const fromInput = overrideText === undefined;
     const text = (overrideText ?? input).trim();
-    if (!text || remoteTurnActive) return;
+    if (remoteTurnActive) return;
 
     if (loadingRef.current) {
       const chatId =
         activeChatId || streamingChatIdRef.current;
       if (!chatId) return;
+
+      const queueLen = (queuesRef.current[chatId] || []).length;
+      if (!text && queueLen > 0) {
+        steerNextQueued(chatId);
+        return;
+      }
+      if (!text) return;
+
       enqueuePrompt(chatId, text);
       if (fromInput) {
         setInput("");
@@ -875,6 +915,8 @@ export default function ChatInterface({
       }
       return;
     }
+
+    if (!text) return;
 
     let chatId = activeChatId;
     if (!chatId) {
@@ -1081,6 +1123,35 @@ export default function ChatInterface({
             )}
             {isSharedMode && (
               <span className="shared-room-badge">Live shared room</span>
+            )}
+            {!isSharedMode && !showEmptyState && activeChatId && (
+              editingTitle ? (
+                <input
+                  autoFocus
+                  className="chat-title-input"
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onBlur={() => void saveTitleEdit(activeChatId)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void saveTitleEdit(activeChatId);
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      setEditingTitle(false);
+                    }
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="chat-title-btn"
+                  onClick={() => startTitleEdit(activeChatId)}
+                  title="Rename chat"
+                >
+                  {chats.find((c) => c.id === activeChatId)?.title || "Untitled chat"}
+                </button>
+              )
             )}
             {showEmptyState && <h1>EIF AI Advisor</h1>}
           </div>
@@ -1365,7 +1436,9 @@ export default function ChatInterface({
                     remoteTurnActive
                       ? "Waiting for current turn…"
                       : loading
-                        ? "Queue a follow-up..."
+                        ? activeQueue.length > 0
+                          ? "Press Enter to steer..."
+                          : "Queue a follow-up..."
                         : "Message..."
                   }
                   value={input}
@@ -1419,13 +1492,19 @@ export default function ChatInterface({
                   disabled={
                     !isAuthenticated ||
                     !activeChatId ||
-                    !input.trim() ||
                     messagesLoading ||
-                    remoteTurnActive
+                    remoteTurnActive ||
+                    (!input.trim() && !(loading && activeQueue.length > 0))
                   }
                   onClick={() => sendMessage()}
                   type="button"
-                  title={loading ? "Add to queue" : "Send message"}
+                  title={
+                    loading
+                      ? !input.trim() && activeQueue.length > 0
+                        ? "Steer with next queued prompt"
+                        : "Add to queue"
+                      : "Send message"
+                  }
                 >
                   <svg viewBox="0 0 24 24">
                     <path d="M3 20V4L22 12L3 20ZM5 17L16.85 12L5 7V10.5L11 12L5 13.5V17Z" />
